@@ -353,10 +353,16 @@ function Stack(
 
 	//! estimate the zoom levels
 	self.MAX_S = 0;
-	var min_max = Math.min( MAX_X, MAX_Y );
-	var min_size = 256;
-	while ( min_max / Math.pow( 2, self.MAX_S ) / min_size > 4 )
-		++self.MAX_S;
+	heuristic_estimate = false;
+	if (heuristic_estimate) {
+		// use a simple heuristic for estimation
+		var min_max = Math.min( MAX_X, MAX_Y );
+		var min_size = 256;
+		while ( min_max / Math.pow( 2, self.MAX_S ) / min_size > 4 )
+			++self.MAX_S;
+	} else {
+		self.MAX_S = 3;
+	}
 	
 	//! all possible slices
 	self.slices = new Array();
