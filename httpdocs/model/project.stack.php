@@ -116,6 +116,25 @@ try {
       emitErrorAndExit( $db, 'Failed to commit!' );
     }
 
+   /* Check for the maximum available zoom level by trying which
+    * zoom levels are available for the first picture.
+    */
+   $raw_url = $project_stack['image_base'] . "0/0_0_";
+   $zoom_level = 0;
+   while (true) {
+     $img_url = $raw_url . $zoom_level . ".jpg";
+     $project_stack[ 'max_zoom_level_url' ] = $img_url;
+     if( !url_exists($img_url) || $zoom_level > 10) {
+       // the current zoom level does not exist
+       // or 10 zoom levels reached (in case anything is wrong
+       // with the url_exists() method
+       $zoom_level--;
+       break;
+     }
+     $zoom_level++;
+   }
+   $project_stack[ 'max_zoom_level' ] = $zoom_level;
+
     echo makeJSON( $project_stack );
 
   } else {
