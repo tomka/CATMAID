@@ -44,6 +44,7 @@ function Stack(
 	 */
 	var updateScaleBar = function()
 	{
+		// calculate pixels per nanometers wrt. scale
 		var meter = self.scale / resolution.x;
 		var width = 0;
 		var text = "";
