@@ -123,7 +123,7 @@ else:
     user_id = row[0]
 
 # Stack selection
-data_dir = raw_input("Data folder (with folder for each stack): ")
+data_dir = raw_input("Data folder (with folder for each stack or stack-hierarchy): ")
 if data_dir[len(data_dir)-1] != "/":
 	data_dir = data_dir + "/"
 if not os.path.isdir(data_dir):
@@ -134,6 +134,7 @@ else:
 stack_dirs = []
 for currentFile in glob.glob( os.path.join(data_dir, '*') ):
 	if os.path.isdir(currentFile):
+		print currentFile
 		stack_dirs.append(currentFile)
 
 # Find projects among stacks
@@ -141,6 +142,7 @@ projects = {}
 projectNames = {}
 for stack in stack_dirs:
 		folderName = stack.replace(data_dir, "")
+		parentName = folderName[:folderName.rfind("/")]
 		dim = ""
 		res = ""
 		name = ""
@@ -153,8 +155,9 @@ for stack in stack_dirs:
 			res = info['resolution']
 			name = info['name']
 		except:
-			print >> sys.stderr, "Could not read info.yml of stack " + stack
-			sys.exit(1)
+			print >> sys.stderr, "Could not read info.yml of stack " + stack + " -- ignoring it"
+			continue
+			#sys.exit(1)
 		stack_name = folderName
 		# Rename stack if requested
 		if simplify_stack_names:
@@ -177,6 +180,7 @@ for stack in stack_dirs:
 		# Remember the name for the project if not already there
 		if projectId not in projectNames:
 			projectNames[projectId] = name
+
 for p in projects:
 	projects[p].sort()
 	print 'projec: ' + p
