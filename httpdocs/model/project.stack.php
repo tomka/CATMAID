@@ -116,13 +116,46 @@ try {
       emitErrorAndExit( $db, 'Failed to commit!' );
     }
 
+   /* Find out what file type is used by looking at the files that are
+    * stored under the image_base path. We cannot rely on being able
+    * to get a file list, so we rather test against a list of known
+    * extensions.
+    */
+   function findExtension( $image_base ) {
+     $known_extensions = array("jpg", "png", "gif", "bmp", "jpeg", "tif",
+        "tiff","svg", "j2k");
+     $raw_url = $image_base . "0/0_0_0.";
+     foreach ( $known_extensions as $ext ) {
+       $img_url = $raw_url . $ext;
+       if( url_exists($img_url) ) {
+         // we found a valid file format
+         return $ext;
+       }
+     }
+     return "";
+   }
+   // find image file format of the project stack
+   $file_extension = findExtension( $project_stack[ 'image_base' ] );
+   if ($file_extension == "") {
+      emitErrorAndExit( $db, 'Could not find image file format of data set!' );
+   }
+   $project_stack[ 'file_extension' ] = $file_extension;
+   // find image file format of the overlays
+   foreach ( $overlays as $ol ) {
+     $file_extension = findExtension( $ol[ 'image_base' ] );
+     if ($file_extension == "") {
+        emitErrorAndExit( $db, 'Could not find image file format of overlay!' );
+     }
+     $ol[ 'file_extension' ] = $file_extension;
+   }
+
    /* Check for the maximum available zoom level by trying which
     * zoom levels are available for the first picture.
     */
    $raw_url = $project_stack['image_base'] . "0/0_0_";
    $zoom_level = 0;
    while (true) {
-     $img_url = $raw_url . $zoom_level . ".jpg";
+     $img_url = $raw_url . $zoom_level . "." . $file_extension;
      $project_stack[ 'max_zoom_level_url' ] = $img_url;
      if( !url_exists($img_url) || $zoom_level > 10) {
        // the current zoom level does not exist
