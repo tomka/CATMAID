@@ -15,6 +15,8 @@ num = r'[-+]?[0-9]*\.?[0-9]+'
 integer = r'[-+]?[0-9]+'
 # A regular expression matching lists of integers with comma as delimiter
 intlist = r'[0-9]+(,[0-9]+)*'
+# Matches a lists of integers or floating point numbers with comma as delimiter
+numlist = r'%s(,%s)*' % (num, num)
 
 # Add the main index.html page at the root:
 urlpatterns = patterns('',
@@ -338,6 +340,11 @@ urlpatterns += patterns('',
     url(r'^clustering/(?P<workspace_pid>{0})/show$'.format(integer),
         TemplateView.as_view(template_name="catmaid/clustering/display.html"),
         name="clustering_display"),
+    )
+
+# Tile processing
+urlpatterns += patterns('',
+    (r'^(?P<project_id>\d+)/stack/(?P<stack_ids>%s)/combine_tiles/(?P<section>\d+)/(?P<x>\d+)/(?P<y>\d+)/(?P<zoom_level>\d+)/(?P<intensities>%s)/$' % (intlist, numlist), 'catmaid.control.create_tile' )
     )
 
 if settings.DEBUG:

@@ -444,6 +444,15 @@ function updateProjectListFromCache() {
         toappend.push(ddc);
       }
     }
+
+    // adjustable composite
+    var dd = document.createElement("dd");
+    var a_ct = document.createElement("a");
+    a_ct.href = "javascript:openProjectStack(" + p.pid + ", " + getFirstKey( projects_available[ p.pid ] ) +  ", true)"
+    a_ct.appendChild(document.createTextNode("Adjustable Composite"));
+    dd.appendChild(a_ct);
+    toappend.push(dd);
+
     // optionally, add a neuron catalogue link
     if (p.catalogue) {
       catalogueElement = document.createElement('dd');
@@ -472,11 +481,25 @@ function updateProjectListFromCache() {
  * queue an open-project-stack-request to the request queue
  * freeze the window to wait for an answer
  */
-function openProjectStack( pid, sid, completionCallback )
+function openProjectStack( pid, sid, adjustable_stack, completionCallback )
 {
 	if ( project && project.id != pid )
 	{
 		project.destroy();
+	}
+
+	handler = null;
+	if ( adjustable_stack == undefined || adjustable_stack == false )
+	{
+		handler = function( status, text, xml ) {
+			handle_openProjectStack( status, text, xml, false );
+		};
+	}
+	else
+	{
+		handler = function( status, text, xml ) {
+			handle_openProjectStack( status, text, xml, true );
+		};
 	}
 
 	ui.catchEvents( "wait" );
@@ -486,7 +509,7 @@ function openProjectStack( pid, sid, completionCallback )
 		{ },
 		function(args)
 		{
-			handle_openProjectStack.apply(this, arguments);
+            handler.apply(this, arguments)
 			if (completionCallback)
 			{
 				completionCallback();
@@ -501,7 +524,7 @@ function openProjectStack( pid, sid, completionCallback )
  *
  * free the window
  */
-function handle_openProjectStack( status, text, xml )
+function handle_openProjectStack( status, text, xml, adjustable_stack )
 {
 	if ( status == 200 && text )
 	{
@@ -547,14 +570,23 @@ function handle_openProjectStack( status, text, xml )
 
 			document.getElementById( "toolbox_project" ).style.display = "block";
 
-			var tilesource = getTileSource( e.tile_source_type, e.image_base,
+			var tilelayer;
+			if ( adjustable_stack )
+			{
+				tilelayer = new ProcTileLayer(
+					stack, e.tile_width, e.tile_height);
+			}
+			else
+			{
+			    var tilesource = getTileSource( e.tile_source_type, e.image_base,
 					e.file_extension );
-			var tilelayer = new TileLayer(
+				tilelayer = new TileLayer(
 					stack,
 					e.tile_width,
 					e.tile_height,
 					tilesource,
 					true);
+			}
 
 			stack.addLayer( "TileLayer", tilelayer );
 
