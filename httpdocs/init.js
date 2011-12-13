@@ -334,7 +334,7 @@ function handle_openProjectStack( status, text, xml )
 			
 			document.getElementById( "toolbox_project" ).style.display = "block";
 			
-			var tilelayer = new TileLayer(
+			var tilelayer = new ProcTileLayer(
 					stack,
 					e.image_base,
 					e.tile_width,
