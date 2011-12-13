@@ -100,6 +100,7 @@ class StackInfo:
 		self.res = res
 		self.comment = ''
 		self.base_url = url
+		self.file_ext = 'jpg'
 
 	def __cmp__(self, other):
 		return cmp(self.name, other.name)
@@ -237,9 +238,9 @@ for p in projects:
 	print '\tlinked it to user with ID ' + str(user_id)
 	# Add stacks
 	for s in projects[p]:
-		insert = 'INSERT INTO stack (title, dimension, resolution, image_base, comment) '
-		insert += 'VALUES (%s, %s, %s, %s, %s) RETURNING id'
-		c.execute( insert, (s.name, s.dim, s.res, s.base_url, s.comment) )
+		insert = 'INSERT INTO stack (title, dimension, resolution, image_base, comment, file_extension) '
+		insert += 'VALUES (%s, %s, %s, %s, %s, %s) RETURNING id'
+		c.execute( insert, (s.name, s.dim, s.res, s.base_url, s.comment, s.file_ext) )
 		stack_id = c.fetchone()[0]
 		print '\tcreated new stack ' + s.name + ' with ID ' +str(stack_id)
 		# Update the project_stack table
