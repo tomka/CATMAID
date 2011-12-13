@@ -319,6 +319,15 @@ function handle_updateProjects(status, text, xml) {
             pp.appendChild(ddc);
           }
         }
+
+        // adjustable composite
+        var dd = document.createElement("dd");
+        var a_ct = document.createElement("a");
+        a_ct.href = "javascript:openProjectStack(" + e[i].pid + ", " + getFirstKey( projects_available[ e[i].pid ] ) + ", true)"
+        a_ct.appendChild(document.createTextNode("Adjustable Composite"));
+        dd.appendChild(a_ct);
+        pp.appendChild(dd);
+
         if (e[i].catalogue) {
           var catalogueElement = document.createElement('dd');
           var catalogueElementLink = document.createElement('a');
@@ -404,6 +413,15 @@ function updateProjectListFromCache(pp) {
         toappend.push(ddc);
       }
     }
+
+    // adjustable composite
+    var dd = document.createElement("dd");
+    var a_ct = document.createElement("a");
+    a_ct.href = "javascript:openProjectStack(" + p.pid + ", " + getFirstKey( projects_available[ p.pid ] ) +  ", true)"
+    a_ct.appendChild(document.createTextNode("Adjustable Composite"));
+    dd.appendChild(a_ct);
+    toappend.push(dd);
+
     if (p.catalogue) {
       catalogueElement = document.createElement('dd');
       catalogueElementLink = document.createElement('a');
@@ -431,18 +449,26 @@ function updateProjectListFromCache(pp) {
  * queue an open-project-stack-request to the request queue
  * freeze the window to wait for an answer
  */
-function openProjectStack( pid, sid )
+function openProjectStack( pid, sid, adjustable_stack )
 {
 	if ( project && project.id != pid )
 	{
 		project.destroy();
 	}
+	if ( adjustable_stack == undefined || adjustable_stack == false )
+	{
+		adjustable_stack = 0;
+	}
+	else
+	{
+		adjustable_stack = 1;
+	}
 	ui.catchEvents( "wait" );
 	requestQueue.register(
 		'model/project.stack.php',
-		//'dj/' + pid + '/stack/' + sid + '/info',
+		//'dj/' + pid + '/stack/' + sid + '/adj/' + adjustable_stack + '/info',
 		'POST',
-		{ pid : pid, sid : sid },
+		{ pid : pid, sid : sid, adjustable : adjustable_stack },
         // {},
 		handle_openProjectStack );
 	return;
@@ -498,14 +524,27 @@ function handle_openProjectStack( status, text, xml )
 
 			document.getElementById( "toolbox_project" ).style.display = "block";
 			
-			var tilelayer = new TileLayer(
+			var tilelayer;
+			if ( e.adjustable )
+			{
+				tilelayer = new ProcTileLayer(
 					stack,
 					e.image_base,
 					e.tile_width,
 					e.tile_height,
 					e.file_extension,
 					e.tile_source_type);
-
+			}
+			else
+			{
+				tilelayer = new TileLayer(
+					stack,
+					e.image_base,
+					e.tile_width,
+					e.tile_height,
+					e.file_extension,
+					e.tile_source_type);
+			}
 			stack.addLayer( "TileLayer", tilelayer );
 
 			$.each(e.overlay, function(key, value) {
