@@ -270,6 +270,8 @@ function handle_updateProjects(status, text, xml) {
     var keep_project_alive = false;
     var keep_project_editable = false;
 
+    var pp = document.getElementById("projects_dl");
+
     if (e.error) {
       project_menu_open.update();
       alert(e.error);
