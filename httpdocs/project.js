@@ -233,6 +233,7 @@ function Project( pid )
 		document.getElementById("toolbox_data").style.display = "none";
         document.getElementById( "toolbox_project" ).style.display = "none";
         document.getElementById( "toolbar_nav" ).style.display = "none";
+        document.getElementById( "toolbar_crop" ).style.display = "none";
 
 		project = null;
 

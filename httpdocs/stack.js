@@ -447,6 +447,8 @@ function Stack(
 	
 	self.scale = 1 / Math.pow( 2, self.s );
 	self.old_scale = self.scale;
+
+    self.is_trackem2_stack = trakem2_project;
 }
 
 //!< in nanometers
