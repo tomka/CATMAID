@@ -47,6 +47,10 @@ var messageWindow = null;
 
 var rootWindow;
 
+// url of the django instance relative to the CATMAID URL
+// (if any, needed e.g. by cropping tool). It is expected
+// to end with a slash.
+var django_url = "dj/"
 
 /**
  * queue a login-request on pressing return

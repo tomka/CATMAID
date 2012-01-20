@@ -30,6 +30,11 @@ TEMPLATE_DIRS = (
     '/home/mark/neuron-catalogue/templates'
 )
 
+# Define a temporary folder. This is e.g. used to store cropped
+# microstacks for two weeks. Make sure that the folder is writable
+# by the user running the web server.
+TMP_DIR = '/home/tom/catmaid/tmp'
+
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
@@ -49,6 +54,10 @@ SITE_ID = 1
 CATMAID_URL = '/'
 STATICFILES_URL = '/static/'
 STATICFILES_LOCAL = '/home/mark/neuron-catalogue/static/'
+
+# Define the URL of your CATMAIDs Django instance as it should appear in
+# front of all Django related URLs.
+CATMAID_DJANGO_URL = 'http://your.domain.to/catmaid/dj/'
 
 PROJECT_ROOT = os.path.realpath(os.path.join(
         os.path.dirname(__file__), '..', '..'))
