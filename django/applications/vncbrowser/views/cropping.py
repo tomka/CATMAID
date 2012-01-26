@@ -122,11 +122,10 @@ def get_tile_path(job, tile_coords):
     path += str(tile_coords[1]) + "_" + str(tile_coords[0]) + "_" + str(job.zoom_level) + "." + job.stack.file_extension
     return path
 
-def process_crop_job(job):
-    """ This method does the actual cropping.
+def extract_substack( job ):
+    """ Extracts a sub-stack as specified in the passed job. A list of
+    pgmagick images is returned -- one for each slice, starting on top.
     """
-    # TODO: Check if asynchronous execution is needed, like with PHPs ignore_user_abort()
-    # see e.g.: http://stackoverflow.com/questions/4925629/ignore-user-abort-php-simil-in-django-python
 
     # Calculate the slice numbers and pixel positions
     # bounded to the stack data.
@@ -199,6 +198,17 @@ def process_crop_job(job):
         # Add the imag to the cropped stack
         cropped_stack.append( cropped_slice )
 
+    return cropped_stack
+
+def process_crop_job(job):
+    """ This method does the actual cropping.
+    """
+    # TODO: Check if asynchronous execution is needed, like with PHPs ignore_user_abort()
+    # see e.g.: http://stackoverflow.com/questions/4925629/ignore-user-abort-php-simil-in-django-python
+
+    # Create the sub-stack
+    cropped_stack = extract_substack( job )
+
     # Create tho output image
     outputImage = ImageList()
     for img in cropped_stack:
@@ -210,7 +220,7 @@ def process_crop_job(job):
     no_error_occured = True
     error_message = ""
     # Only produce an image if parts of stacks are within the output
-    if len(image_parts) > 0:
+    if len( cropped_stack ) > 0:
         try:
             outputImage.writeImages( output_path )
         except IOError, e:
