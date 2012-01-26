@@ -276,7 +276,7 @@ def process_crop_job(job):
         url = os.path.join( settings.CATMAID_DJANGO_URL, "crop/download/" + file_name + "/")
         response_message = url
         msg.title = "Microstack finished"
-        msg.text = "The requested microstack " + bb_text + " is finished. You can download it from this location: " + url
+        msg.text = "The requested microstack " + bb_text + " is finished. You can download it from this location: <a href=\"" + url + "\">" + url + "</a>"
         msg.action = url
     else:
         msg.title = "Microstack could not be created"
