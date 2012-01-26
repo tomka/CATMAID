@@ -271,8 +271,10 @@ def process_crop_job(job):
     msg = Message()
     msg.user = job.user
     msg.read = False
+    response_message = ""
     if no_error_occured:
         url = os.path.join( settings.CATMAID_DJANGO_URL, "crop/download/" + file_name + "/")
+        response_message = url
         msg.title = "Microstack finished"
         msg.text = "The requested microstack " + bb_text + " is finished. You can download it from this location: " + url
         msg.action = url
@@ -283,7 +285,7 @@ def process_crop_job(job):
     msg.save()
 
     # Create closing response
-    closingResponse = HttpResponse(json.dumps(""), mimetype="text/json")
+    closingResponse = HttpResponse(json.dumps(response_message), mimetype="text/json")
     closingResponse['Connection'] = 'close'
 
     return closingResponse
