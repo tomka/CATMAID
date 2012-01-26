@@ -77,46 +77,6 @@ def id_generator(size=6, chars=string.ascii_lowercase + string.digits):
     """
     return ''.join(random.choice(chars) for x in range(size))
 
-def get_crop_info(job):
-    """ Returns a dictionary with relevant information for stacks
-    """
-    p = job.project
-    s = job.stack
-    result={
-        'project_id':job.project_id,
-        'project_title':p.title,
-        'stack_id': job.stack_id,
-        'stack_title': s.title,
-        'stack_scale': {
-            'x': float(s.resolution.x),
-            'y': float(s.resolution.y),
-            'z': float(s.resolution.z)
-        },
-        'stack_dimension': {
-            'x': int(s.dimension.x),
-            'y': int(s.dimension.y),
-            'z': int(s.dimension.z)
-        },
-        'stack_scaled_unit': "nm",
-        'stack_comment':s.comment,
-        'stack_image_base':s.image_base,
-        # TODO: fix
-        'stack_translation': {
-            'x': 0.0,
-            'y': 0.0,
-            'z': 0.0
-        },
-        'cropping_boundingbox': {
-           'x_min': float(job.x_min),
-           'x_max': float(job.x_max),
-           'y_min': float(job.y_min),
-           'y_max': float(job.y_max),
-           'z_min': float(job.z_min),
-           'z_max': float(job.z_max),
-        }
-    }
-    return result
-
 def to_x_index( x, job, enforce_bounds=True ):
     """ Converts a real world position to a x pixel position.
     Also, makes sure the value is in bounds.
@@ -165,9 +125,6 @@ def get_tile_path(job, tile_coords):
 def process_crop_job(job):
     """ This method does the actual cropping.
     """
-    result = get_crop_info(job)
-    infoResponse = HttpResponse(json.dumps(result, sort_keys=True, indent=4), mimetype="text/json")
-
     # TODO: Check if asynchronous execution is needed, like with PHPs ignore_user_abort()
     # see e.g.: http://stackoverflow.com/questions/4925629/ignore-user-abort-php-simil-in-django-python
 
