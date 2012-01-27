@@ -99,3 +99,16 @@ file and set up the appropriate aliases.  An example is given here:
             Allow from all
 
     </Directory> 
+
+If mod_wsgi prior to version 3.0 is used, you need to disable some restrictions
+regarding the use of standard input and output: the cropping tool will execute
+in a background process and uses the Python module multiprocessing for this.
+Unfortunately, this module requires access to standard input and output, which
+is not allowed per default in mod_wsgi prior to version 3.0 [1]. To allow this,
+you can add the following two lines *outside* of the VirtualHost definition
+in your Apache configuration file:
+
+    WSGIRestrictStdin Off
+    WSGIRestrictStdout Off
+
+[1] http://code.google.com/p/modwsgi/wiki/ApplicationIssues

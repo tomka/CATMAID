@@ -58,6 +58,8 @@ STATICFILES_LOCAL = '/home/mark/neuron-catalogue/static/'
 # Define the URL of your CATMAIDs Django instance as it should appear in
 # front of all Django related URLs.
 CATMAID_DJANGO_URL = 'http://your.domain.to/catmaid/dj/'
+# Define the local path to CATMAIDs Django instance.
+CATMAID_DJANGO_LOCAL = '/home/tom/catmaid/django/'
 
 PROJECT_ROOT = os.path.realpath(os.path.join(
         os.path.dirname(__file__), '..', '..'))

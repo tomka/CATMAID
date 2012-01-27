@@ -15,6 +15,8 @@ try:
     import os.path
     import glob
     from time import mktime, gmtime
+    from multiprocessing import Process
+    import subprocess
 except ImportError:
     pass
 
@@ -200,59 +202,76 @@ def extract_substack( job ):
 
     return cropped_stack
 
-def process_crop_job(job):
-    """ This method does the actual cropping.
+def process_crop_job(job, catmaid_django_path):
+    """ This method does the actual cropping. It controls the data extraction
+    and the creation of the sub-stack. 
     """
-    # TODO: Check if asynchronous execution is needed, like with PHPs ignore_user_abort()
-    # see e.g.: http://stackoverflow.com/questions/4925629/ignore-user-abort-php-simil-in-django-python
-
-    # Create the sub-stack
-    cropped_stack = extract_substack( job )
-
-    # Create tho output image
-    outputImage = ImageList()
-    for img in cropped_stack:
-        outputImage.append( img )
-
-    # Save the resulting micro_stack to a temporary location
     file_name = file_prefix + id_generator() + "." + file_extension
     output_path = os.path.join(settings.TMP_DIR, file_name)
-    no_error_occured = True
-    error_message = ""
-    # Only produce an image if parts of stacks are within the output
-    if len( cropped_stack ) > 0:
-        try:
+    try:
+        # Create the sub-stack
+        cropped_stack = extract_substack( job )
+
+        # Create tho output image
+        outputImage = ImageList()
+        for img in cropped_stack:
+            outputImage.append( img )
+
+        # Save the resulting micro_stack to a temporary location
+        no_error_occured = True
+        error_message = ""
+        # Only produce an image if parts of stacks are within the output
+        if len( cropped_stack ) > 0:
             outputImage.writeImages( output_path )
-        except IOError, e:
+        else:
             no_error_occured = False
-            error_message = str(e)
-            # Delete the file if parts of it have been written already
-            if os.path.exists( output_path ):
-                os.remove( output_path )
-    else:
+            error_message = "A region outside the stack has been selected. Therefore, no image was produced."
+    except (IOError, OSError), e:
         no_error_occured = False
-        error_message = "A region outside the stack has been selected. Therefore, no image was produced."
+        error_message = str(e)
+        # Delete the file if parts of it have been written already
+        if os.path.exists( output_path ):
+            os.remove( output_path )
 
     # Create a notification message
     bb_text = "( " + str(job.x_min) + ", " + str(job.y_min) + ", " + str(job.z_min) + " ) -> ( " + str(job.x_max) + ", " + str(job.y_max) + ", " + str(job.z_max) + " )"
-    msg = Message()
-    msg.user = job.user
-    msg.read = False
-    response_message = ""
+
+    msg_user = job.user.id
+    msg_title = ""
+    msg_text = ""
+    msg_action = ""
     if no_error_occured:
         url = os.path.join( settings.CATMAID_DJANGO_URL, "crop/download/" + file_name + "/")
-        response_message = url
-        msg.title = "Microstack finished"
-        msg.text = "The requested microstack " + bb_text + " is finished. You can download it from this location: <a href=\"" + url + "\">" + url + "</a>"
-        msg.action = url
+        msg_title = "Microstack finished"
+        msg_text = "The requested microstack " + bb_text + " is finished. You can download it from this location: <a href='" + url + "'>" + url + "</a>"
+        msg_action = url
     else:
-        msg.title = "Microstack could not be created"
-        msg.text = "The requested microstack " + bb_text + " could not be created due to an error while saving the result (" + error_message + ")."
-        msg.action = ""
-    msg.save()
+        msg_title = "Microstack could not be created"
+        msg_text = "The requested microstack " + bb_text + " could not be created due to an error while saving the result (" + error_message + ")."
+        msg_action = ""
+
+    project_path = os.path.join( catmaid_django_path, "projects/mysite/" )
+    python_path = os.path.join( catmaid_django_path, "env/bin/python" )
+    manage_path = os.path.join( project_path, "manage.py" )
+
+    # This method is ought to be run as a seperate process. Therfore it has
+    # no direct acess to Django anymore. The message about the finishing of
+    # the cropping job is put in the data base with the help of the addmessage
+    # command of manage.py.
+    arguments = "addmessage {1} \"{2}\" \"{3}\" \"{4}\"".format( manage_path, msg_user, msg_title, msg_text, msg_action )
+    call = "{0} {1} {2}".format(python_path, manage_path, arguments)
+    subprocess.Popen(call, shell=True, cwd=project_path)
+
+def start_asynch_process( job ):
+    """ It launches the data extraction and sub-stack building as a seperate process.
+    This process uses the addmessage command with manage.py to write a message for the
+    user into the data base once the process is done.
+    """
+    p = Process( target=process_crop_job, args=( job, settings.CATMAID_DJANGO_LOCAL ) )
+    p.start()
 
     # Create closing response
-    closingResponse = HttpResponse(json.dumps(response_message), mimetype="text/json")
+    closingResponse = HttpResponse(json.dumps(""), mimetype="text/json")
     closingResponse['Connection'] = 'close'
 
     return closingResponse
@@ -301,8 +320,7 @@ def crop(request, project_id=None, stack_id=None, x_min=None, x_max=None, y_min=
         err_response['Connection'] = 'close'
         return err_response
         
-    result = process_crop_job(job)
-
+    result = start_asynch_process( job )
     return result
 
 @catmaid_login_required
