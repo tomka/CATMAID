@@ -3,6 +3,7 @@
 
 from settings_base import *
 import sys, os
+import djcelery
 
 DATABASES = {
     'default': {
@@ -32,7 +33,7 @@ TEMPLATE_DIRS = (
 
 # Define a temporary folder. This is e.g. used to store cropped
 # microstacks for two weeks. Make sure that the folder is writable
-# by the user running the web server.
+# by the user running the webserver and Celery.
 TMP_DIR = '/home/tom/catmaid/tmp'
 
 DEBUG = True
@@ -58,6 +59,18 @@ STATICFILES_LOCAL = '/home/mark/neuron-catalogue/static/'
 # Define the URL of your CATMAIDs Django instance as it should appear in
 # front of all Django related URLs.
 CATMAID_DJANGO_URL = 'http://your.domain.to/catmaid/dj/'
+
+## Celery configuration
+djcelery.setup_loader()
+# Simple django-kumbo broke
+INSTALLED_APPS += ("djkombu",)
+BROKER_BACKEND = "djkombu.transport.DatabaseTransport"
+# General broker configuration
+BROKER_HOST = "localhost"
+BROKER_PORT = 5672
+BROKER_USER = "guest"
+BROKER_PASSWORD = "guest"
+BROKER_VHOST = "/"
 
 PROJECT_ROOT = os.path.realpath(os.path.join(
         os.path.dirname(__file__), '..', '..'))
