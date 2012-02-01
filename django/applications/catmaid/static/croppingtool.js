@@ -19,6 +19,10 @@ function CroppingTool() {
 	var self = this;
 	this.toolname = "croppingtool";
 
+	// Output unit and factor in wrt. nm
+	this.output_unit = unescape( "%u03BCm" )
+	this.output_unit_factor = 0.001;
+
 	this.slider_crop_top_z = new Slider(
 			SLIDER_HORIZONTAL,
 			true,

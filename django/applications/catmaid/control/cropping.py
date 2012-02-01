@@ -35,6 +35,9 @@ file_extension = "tiff"
 # The path were cropped files get stored in
 crop_output_path = os.path.join(settings.MEDIA_ROOT,
     settings.MEDIA_CROPPING_SUBDIRECTORY)
+# Output unit and factor relative to nm
+output_unit = "micron"
+output_unit_factor = 1e-3
 
 class CropJob:
     """ A small container class to keep information about the cropping
@@ -164,10 +167,10 @@ def addMetaData( path, job, result ):
     meta data. Currently, there semms no better solution than this. If the
     tool is not found, no meta data is produced and no error is raised.
     """
-    # Add resolution information in pixel per nanometer. The stack info
+    # Add resolution information in pixel per output unit. The stack info
     # available is nm/px and refers to a zoom-level of zero.
-    res_x_scaled = job.ref_stack.resolution.x * 2**job.zoom_level
-    res_y_scaled = job.ref_stack.resolution.y * 2**job.zoom_level
+    res_x_scaled = job.ref_stack.resolution.x * 2**job.zoom_level * output_unit_factor
+    res_y_scaled = job.ref_stack.resolution.y * 2**job.zoom_level * output_unit_factor
     res_x_nm_px = 1.0 / res_x_scaled
     res_y_nm_px = 1.0 / res_y_scaled
     res_args = "-EXIF:XResolution={0} -EXIF:YResolution={1} -EXIF:ResolutionUnit=None".format( str(res_x_nm_px), str(res_y_nm_px) )
@@ -176,7 +179,7 @@ def addMetaData( path, job, result ):
     # display options.
     n_images = len( result )
     ij_version= "1.45p"
-    unit = "nm"
+    unit = output_unit
     newline = "\n"
 
     # sample with (the actual is a line break instead of a .):
