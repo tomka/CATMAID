@@ -315,6 +315,20 @@ var createEditToolActions = function() {
         }
       }));
   }
+
+  editToolActions.push(
+	new Action({
+		helpText: "Thumbnail tool",
+		buttonID: 'edit_button_thumbnail',
+		buttonName: 'thumbnail',
+		keyShortcuts: {
+			'T': [ 84 ]
+		},
+		run: function (e) {
+			project.setTool( new DBThumbnailTool() );
+			return true;
+		}
+	}));
 }
 
 /* Edit tools are dependent on the current user. Therefore,

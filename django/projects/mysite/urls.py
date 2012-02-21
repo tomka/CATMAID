@@ -347,6 +347,11 @@ urlpatterns += patterns('',
     (r'^(?P<project_id>\d+)/stack/(?P<stack_ids>%s)/combine_tiles/(?P<section>\d+)/(?P<x>\d+)/(?P<y>\d+)/(?P<zoom_level>\d+)/(?P<intensities>%s)/$' % (intlist, numlist), 'catmaid.control.create_tile' )
     )
 
+# Thumbnailing
+urlpatterns += patterns('',
+    (r'^(?P<project_id>\d+)/stack/(?P<stack_id>\d+)/thumbnail/(?P<x_min>%s),(?P<x_max>%s)/(?P<y_min>%s),(?P<y_max>%s)/(?P<z_min>%s),(?P<z_max>%s)/(?P<zoom_level>\d+)/(?P<tissue>.*)/(?P<metadata>.*)/$' % (num, num, num, num, num, num), 'catmaid.control.make_thumbnail' )
+    )
+
 if settings.DEBUG:
     urlpatterns += patterns('',
         (r'^static/(?P<path>.*)$', 'django.views.static.serve', {'document_root': settings.STATIC_ROOT}),

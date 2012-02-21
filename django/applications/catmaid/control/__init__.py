@@ -42,3 +42,5 @@ from classification import *
 from notifications import *
 from roi import *
 from clustering import *
+from thumbnail import *
+from image_processing import *

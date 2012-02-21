@@ -85,6 +85,7 @@
 		<script type="text/javascript" src="{{ STATIC_URL }}widgets/canvastool.js"></script>
 		<script type="text/javascript" src="{{ STATIC_URL }}widgets/canvaslayer.js"></script>
 		<script type="text/javascript" src="{{ STATIC_URL }}proctilelayer.js"></script>
+		<script type="text/javascript" src="{{ STATIC_URL }}dbthumbnailtool.js"></script>
 
 		<!--[if gte IE 5]>
 		<script type="text/javascript" src="{{ STATIC_URL }}libs/excanvas/excanvas.js"></script>
@@ -308,6 +309,22 @@
 					<p><input type="radio" name="ontology_space" value="classification" />
 					<p>&nbsp;project independent</p>
 				</div>
+				<div class="toolbar_fill"></div>
+			</div>
+			<!--
+			*******************************************************************
+			-->
+
+			<!-- Thumbnail
+			*******************************************************************
+			-->
+			<div id="toolbar_thumbnail" class="toolbar" style="display:none">
+				<div id="thumbnail_tissue_box" class="box">
+					<div class="menu_item" style="float:left" onmouseover="this.lastChild.style.display = 'block';" onmouseout="this.lastChild.style.display = 'none';"><p><a>Tissue:</a></p>
+					<div class="pulldown" id="thumbnail_tissue_menu"></div></div>
+				    <div class="box" id="thumbnail_tissue_name"><p></p></div>
+				</div>
+				<div class="box_right"><a href="#" class="button" id="button_thumbnail_apply" onclick="return false;"><img src="widgets/themes/kde/apply.gif" alt="apply" title="apply" /></a></div>
 				<div class="toolbar_fill"></div>
 			</div>
 			<!--
