@@ -46,3 +46,5 @@ from neurohdf import get_image
 
 from cropping import crop
 from cropping import download_crop
+
+from thumbnail import make_thumbnail
