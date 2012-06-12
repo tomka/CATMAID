@@ -336,6 +336,7 @@ function DBThumbnailTool()
             { name : "Wing Disc", folder : "wing_disc" },
             { name : "Fat Body", folder : "fat_body" },
             { name : "Ovary", folder : "ovary" },
+            { name : "Testis", folder : "testis" },
             { name : "Gut", folder : "gut" } );
         // take tha first tissue as default
         self.selected_tissue = tissues[0];
