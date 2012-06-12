@@ -79,7 +79,7 @@ function ProcTileLayer(
                         SLIDER_HORIZONTAL,
                         false,
                         0,
-                        300,
+                        1000,
                         31,
                         default_intensity,
                         handler );
