@@ -8,6 +8,21 @@ from catmaid.models import Project, Stack
 from celery.task import task
 from pgmagick import Blob, Image, Geometry, Color, CompositeOperator as co, ResolutionType, ChannelType as ch, QuantumOperator as qo
 import urllib2 as urllib
+from celery.task import task
+
+class ProcessingJob:
+    """ A container that keeps data about a procssing job to be done.
+    """
+    def __init__( self, project_id, stack_ids, section, x, y, zoom_level, intensities ):
+        self.project_id = int(project_id)
+        # Get access to the model
+        project = get_object_or_404(Project, pk=project_id)
+        self.stack_ids = stack_ids
+        self.section = section
+        self.x = x
+        self.y = y
+        self.zoom_level = zoom_level
+        self.intensities = intensities
 
 def create_tile_url( base, section, x, y, zoom_level, ext ):
     """ Creates a common CATDMAID tile URL.
@@ -24,20 +39,23 @@ def create_tile(request, project_id=None, stack_ids=None, section=None, x=None, 
     # Make a list out of the stack ids
     string_list = stack_ids.split(",")
     stack_ids = [int( i ) for i in string_list]
-    # Make a list out of the stack ids
+    # Make a list out of the intensities
     string_list = intensities.split(",")
     intensities = [float( i ) for i in string_list]
-    # Get access to the model
-    project = get_object_or_404(Project, pk=project_id)
 
+    job = ProcessingJob( project_id, stack_ids, section, x, y, zoom_level, intensities )
+
+    return process( job )
+
+def process( job ):
     # TODO: Access tile size information through Django model
     geometry = Geometry(256, 256)
     color = Color("black")
     composite = Image(geometry, color)
 
-    for n, s in enumerate( stack_ids ):
+    for n, s in enumerate( job.stack_ids ):
         stack = get_object_or_404(Stack, pk=s)
-        img_url = create_tile_url( stack.image_base, section, x, y, zoom_level, stack.file_extension )
+        img_url = create_tile_url( stack.image_base, job.section, job.x, job.y, job.zoom_level, stack.file_extension )
         img_file = urllib.urlopen( img_url, timeout=30 )
         blob = Blob( img_file.read() )
         image = Image( blob )
@@ -58,7 +76,7 @@ def create_tile(request, project_id=None, stack_ids=None, section=None, x=None, 
         # The remaining channels are gray
 
         # Make the image brighter according to intensity
-        image.modulate( intensities[n], 100.0, 100.0 )
+        image.modulate( job.intensities[n], 100.0, 100.0 )
 
         # Write modulated and color modified image to output image
         composite.composite( image, 0, 0, co.PlusCompositeOp )
@@ -71,7 +89,7 @@ def create_tile(request, project_id=None, stack_ids=None, section=None, x=None, 
     # Return the actual file content
     response = HttpResponse( composite_blob.data )
     response['Content-Type'] = 'image/' + stack.file_extension
-    response['Content-Disposition'] = 'attachment; filename="' + str(intensities[0]) + img_url  + '"'
+    response['Content-Disposition'] = 'attachment; filename="' + str(job.intensities[0]) + img_url  + '"'
     response['Connection'] = 'close'
 
     return response
