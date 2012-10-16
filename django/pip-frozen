@@ -20,3 +20,5 @@ python-libuuid==0.9.0
 pillow==1.7.8
 south==0.7.6
 scipy==0.11.0
+gevent==0.13.8
+django-socketio==0.3.5

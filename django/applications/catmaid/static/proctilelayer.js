@@ -22,13 +22,16 @@ function ProcTileLayer(
     {
         var sids = [];
         var ints = [];
+        var thrs = [];
         for (var s in self.adjustable_stacks)
         {
             sids.push( s );
             ints.push( self.adjustable_stacks[ s ].intensity );
+            thrs.push( self.adjustable_stacks[ s ].threshold );
         }
         url = django_url + project.id + "/stack/" + sids.join() + "/combine_tiles/"
-            + stack.z + "/" + col + "/" + row + "/" + zoom_level + "/" + ints.join() + "/";
+            + stack.z + "/" + col + "/" + row + "/" + zoom_level + "/"
+            + thrs.join() + "/" + ints.join() + "/";
         return url;
     };
 
@@ -36,6 +39,19 @@ function ProcTileLayer(
     {
         return new DummyOverviewLayer();
     }
+
+    // sets the threshold of stack with id s to val
+    this.setThreshold = function( s, val )
+    {
+        val = val.toFixed( 0 );
+        // set the threshold
+        self.adjustable_stacks[ s ].threshold = val;
+        // display some status information
+        var title = self.adjustable_stacks[ s ].data.title;
+        statusBar.replaceLast( "Setting threshold of stack \"" + title  + "\" to " + val );
+        // update the screen
+        self.redraw();
+    };
 
     // sets the intensity of stack with id s to val
     this.setIntensity = function( s, val )
@@ -62,39 +78,66 @@ function ProcTileLayer(
     view.id = "IntensityLayer";
     view.style.zIndex = 6;
 
-    // create a slider for each stack available
+    // create an offset and an adjustment slider for
+    // each stack available
     var project = stack.getProject();
     var stacks = projects_available[project.id];
     self.adjustable_stacks = new Array();
     for ( var s in stacks )
     {
-        var container = document.createElement("div");
-        var default_intensity = 100;
+        // slider for threshold values
+        var threshold_container = document.createElement("div");
+        var default_threshold = 0;
+        var threshold_handler = function( val )
+        {
+            self.setThreshold( this.stackid, val );
+        };
+        var threshold_slider = new Slider(
+                        SLIDER_HORIZONTAL,
+                        false,
+                        0,
+                        255,
+                        256,
+                        default_threshold,
+                        threshold_handler );
 
-        var handler = function( val )
+        threshold_slider.setByValue( default_threshold, true );
+        threshold_slider.stackid = s;
+        threshold_container.className = "IntensityBox";
+        threshold_container.innerHTML += "Threshold of " + stacks[s].title + "<br />";
+        threshold_container.appendChild( threshold_slider.getView() );
+        view.appendChild( threshold_container );
+
+        // slider for intensity values
+        var intensity_container = document.createElement("div");
+        var default_intensity = 100;
+        var intensity_handler = function( val )
         {
             self.setIntensity( this.stackid, val );
         };
-        var slider = new Slider(
+        var intensity_slider = new Slider(
                         SLIDER_HORIZONTAL,
                         false,
                         0,
                         1000,
                         31,
                         default_intensity,
-                        handler );
+                        intensity_handler );
 
-        slider.setByValue( default_intensity, true );
-        slider.stackid = s;
-        container.className = "IntensityBox";
-        container.innerHTML += "Intensity of " + stacks[s].title + "<br />";
-        container.appendChild( slider.getView() );
-        view.appendChild(container);
+        intensity_slider.setByValue( default_intensity, true );
+        intensity_slider.stackid = s;
+        intensity_container.className = "IntensityBox";
+        intensity_container.innerHTML += "Intensity of " + stacks[s].title + "<br />";
+        intensity_container.appendChild( intensity_slider.getView() );
+        view.appendChild( intensity_container );
+
         // fill stack data structure
         self.adjustable_stacks[ s ] = {
+            threshold : default_threshold,
             intensity : default_intensity,
             data : stacks[s],
-            slider : slider
+            intensity_slider : intensity_slider,
+            threshold_slider : threshold_slider
         }
     };
 

@@ -15,7 +15,7 @@ from celery.task import task
 class ProcessingJob:
     """ A container that keeps data about a procssing job to be done.
     """
-    def __init__( self, project_id, stack_ids, section, x, y, zoom_level, intensities ):
+    def __init__( self, project_id, stack_ids, section, x, y, zoom_level, thresholds, intensities ):
         self.project_id = int(project_id)
         # Get access to the model
         project = get_object_or_404(Project, pk=project_id)
@@ -24,6 +24,7 @@ class ProcessingJob:
         self.x = x
         self.y = y
         self.zoom_level = zoom_level
+        self.thresholds = thresholds
         self.intensities = intensities
 
 def create_tile_url( base, section, x, y, zoom_level, ext ):
@@ -31,7 +32,7 @@ def create_tile_url( base, section, x, y, zoom_level, ext ):
     """
     return "{0}{1}/{2}_{3}_{4}.{5}".format( base, section, y, x, zoom_level, ext )
 
-def create_tile(request, project_id=None, stack_ids=None, section=None, x=None, y=None, zoom_level=None, intensities=None):
+def create_tile(request, project_id=None, stack_ids=None, section=None, x=None, y=None, zoom_level=None, thresholds=None, intensities=None):
     """ Creates a tile based on the tiles at the given position in the
     given stacks. The intensities are percentage values (i.e. 100 = no
     change). For now, the colors for the different channels are fixed:
@@ -44,8 +45,14 @@ def create_tile(request, project_id=None, stack_ids=None, section=None, x=None, 
     # Make a list out of the intensities
     string_list = intensities.split(",")
     intensities = [float( i ) for i in string_list]
+    # Make a list out of the thresholds
+    if thresholds is None:
+        thresholds = [0 for i in intensities]
+    else:
+        string_list = thresholds.split(",")
+        thresholds = [int( i ) for i in string_list]
 
-    job = ProcessingJob( project_id, stack_ids, section, x, y, zoom_level, intensities )
+    job = ProcessingJob( project_id, stack_ids, section, x, y, zoom_level, thresholds, intensities )
 
     return process( job )
 
@@ -68,14 +75,20 @@ def process( job ):
             # Channel 0 is blue
             image.quantumOperator( ch.RedChannel, qo.AssignQuantumOp, 0 )
             image.quantumOperator( ch.GreenChannel, qo.AssignQuantumOp, 0 )
+            image.quantumOperator( ch.BlueChannel, qo.ThresholdBlackQuantumOp, job.thresholds[n] )
         elif n == 1:
             # Channel 1 is green
             image.quantumOperator( ch.RedChannel, qo.AssignQuantumOp, 0 )
             image.quantumOperator( ch.BlueChannel, qo.AssignQuantumOp, 0 )
+            image.quantumOperator( ch.GreenChannel, qo.ThresholdBlackQuantumOp, job.thresholds[n] )
         elif n == 2:
             # Channel 2 is magenta
             image.quantumOperator( ch.GreenChannel, qo.AssignQuantumOp, 0 )
-        # The remaining channels are gray
+            image.quantumOperator( ch.BlueChannel, qo.ThresholdBlackQuantumOp, job.thresholds[n] )
+            image.quantumOperator( ch.RedChannel, qo.ThresholdBlackQuantumOp, job.thresholds[n] )
+        else:
+            # The remaining channels are treated as gray
+            image.quantumOperator( ch.GrayChannel, qo.ThresholdBlackQuantumOp, job.thresholds[n] )
 
         # Make the image brighter according to intensity
         image.modulate( job.intensities[n], 100.0, 100.0 )

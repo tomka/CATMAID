@@ -46,7 +46,7 @@ dump_command = ['pg_dump',
                 '--clean',
                 '-U',
                 db_username,
-                '--no-password',
+                '-W',
                 db_database]
 
 with open(output_filename, "w") as fp:

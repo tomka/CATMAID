@@ -33,6 +33,8 @@ function DBThumbnailTool()
         var stacks = projects_available[project.id];
         var stack_ids = "";
         var stack_metadata = "";
+        // currently not in use: export all channels
+        /*
         var nStacks = 0;
         for ( var s in stacks )
         {
@@ -45,6 +47,12 @@ function DBThumbnailTool()
             stack_metadata += projURL.replace( "sid0=" + stack.getId(), "sid0=" + s );
             nStacks++;
         }
+        */
+        // temporary replacement: export only current channel
+        var nStacks = 1;
+        stack_ids = stack.getId();
+        stack_metadata = projURL;
+
         var cb = self.getCropBox();
         var zoom_level = stack.s;
         var z = stack.z * stack.resolution.z + stack.translation.z;

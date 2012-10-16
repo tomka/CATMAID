@@ -344,7 +344,8 @@ urlpatterns += patterns('',
 
 # Tile processing
 urlpatterns += patterns('',
-    (r'^(?P<project_id>\d+)/stack/(?P<stack_ids>%s)/combine_tiles/(?P<section>\d+)/(?P<x>\d+)/(?P<y>\d+)/(?P<zoom_level>\d+)/(?P<intensities>%s)/$' % (intlist, numlist), 'catmaid.control.create_tile' )
+    (r'^(?P<project_id>\d+)/stack/(?P<stack_ids>%s)/combine_tiles/(?P<section>\d+)/(?P<x>\d+)/(?P<y>\d+)/(?P<zoom_level>\d+)/(?P<intensities>%s)/$' % (intlist, numlist), 'catmaid.control.create_tile' ),
+    (r'^(?P<project_id>\d+)/stack/(?P<stack_ids>%s)/combine_tiles/(?P<section>\d+)/(?P<x>\d+)/(?P<y>\d+)/(?P<zoom_level>\d+)/(?P<thresholds>%s)/(?P<intensities>%s)/$' % (intlist, intlist, numlist), 'catmaid.control.create_tile' ),
     )
 
 # Thumbnailing
