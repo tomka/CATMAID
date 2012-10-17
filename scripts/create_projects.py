@@ -217,31 +217,51 @@ else:
 	print "\tProjects will be public."
 	projects_public = "TRUE"
 
+# Ask if all users should be linked to the projects
+link_to_all_users = raw_input("Do you want all users to be linked to the projects? [y]/n: ")
+if link_to_all_users in ('n', 'no', 'nop', 'nope'):
+        print "\tProjects will *not* be linked to all users."
+        link_to_all_users = False
+else:
+        print "\tProjects will be linked to all users."
+        link_to_all_users = True
+
 # Usernames to be linked to the projects
-linked_users_input = True
 linked_users = {}
-while not linked_users:
-	users = raw_input("What are the users that should be linked to the project? ")
-	if users == "":
-		print "\tProject will only be linked to user \"" + username + "\""
-		users = []
-	else:
-		users = users.split(',')
-	if username not in users:
-		users.append( username )
-	accepted = raw_input("The project will be linked to the following " + str(len(users)) + " users " + ', '.join( users ) + " -- alright? [y]/n: ")
-	linked_users_input = accepted in ('n', 'no', 'nop', 'nope')
-	if not linked_users_input:
-		# Get the user ids
-		for u in users:
-			select = 'SELECT u.id FROM "user" u WHERE u.name = %s'
-			c.execute(select, (u,) )
-			row = c.fetchone()
-			if not row:
-				print >> sys.stderr, "Username " + u + " does not exist in the database"
-				linked_users_input = True
-			else:
-				linked_users[u] = row[0]
+if link_to_all_users:
+        select = 'SELECT u.id, u.name FROM "user" u'
+        c.execute( select )
+        rows = c.fetchall()
+        if len( rows ) == 0:
+                print >> sys.stderr, "No users found. Aborting"
+                sys.exit( 1 )
+        for r in rows:
+                linked_users[ r[1] ] = r[0]
+else:
+        linked_users_input = True
+        # Ask for the users to be linked to the project and check if names exist
+        while not linked_users:
+                users = raw_input("What are the users that should be linked to the project? ")
+                if users == "":
+                        print "\tProject will only be linked to user \"" + username + "\""
+                        users = []
+                else:
+                        users = users.split(',')
+                if username not in users:
+                        users.append( username )
+                accepted = raw_input("The project will be linked to the following " + str(len(users)) + " users " + ', '.join( users ) + " -- alright? [y]/n: ")
+                linked_users_input = accepted in ('n', 'no', 'nop', 'nope')
+                if not linked_users_input:
+                        # Get the user ids
+                        for u in users:
+                                select = 'SELECT u.id FROM "user" u WHERE u.name = %s'
+                                c.execute(select, (u,) )
+                                row = c.fetchone()
+                                if not row:
+                                        print >> sys.stderr, "Username " + u + " does not exist in the database"
+                                        linked_users_input = True
+                                else:
+                                        linked_users[u] = row[0]
 
 # Clear DB if requested
 #if clear_db:
