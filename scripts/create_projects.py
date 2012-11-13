@@ -105,15 +105,15 @@ else:
 
 # Get all matching stack folders
 def find_files( path, depth=1 ):
-    dirs = []
-    for currentFile in glob.glob( os.path.join(path, filter_term) ):
-        if os.path.isdir(currentFile):
-            infoFile = os.path.join(currentFile, "info.yml")
-            if os.path.exists(infoFile):
-                dirs.append(currentFile)
-            elif depth > 1:
-                dirs = dirs + find_files( currentFile, depth - 1)
-    return dirs
+	dirs = []
+	for currentFile in glob.glob( os.path.join(path, filter_term) ):
+		if os.path.isdir(currentFile):
+			infoFile = os.path.join(currentFile, "info.yml")
+			if os.path.exists(infoFile):
+				dirs.append(currentFile)
+			elif depth > 1:
+				dirs = dirs + find_files( currentFile, depth - 1)
+	return dirs
 
 stack_dirs = find_files(data_dir, 2)
 
@@ -183,8 +183,8 @@ for stack in stack_dirs:
 			projectNames[projectId] = name
 
 if len(projects) == 0:
-        print("No valid projects found -- exiting")
-        sys.exit(1)
+		print("No valid projects found -- exiting")
+		sys.exit(1)
 
 print("Found the following projects:")
 for p in projects:
@@ -217,66 +217,47 @@ else:
 	print "\tProjects will be public."
 	projects_public = "TRUE"
 
-# Ask if all users should be linked to the projects
-link_to_all_users = raw_input("Do you want all users to be linked to the projects? [y]/n: ")
-if link_to_all_users in ('n', 'no', 'nop', 'nope'):
-        print "\tProjects will *not* be linked to all users."
-        link_to_all_users = False
+# Group name
+groupname = raw_input("Insert the group name that should get access to selected projects: ")
+select = 'SELECT g.id FROM "auth_group" g WHERE g.name = %s'
+c.execute(select, (groupname,) )
+row = c.fetchone()
+if not row:
+	print >> sys.stderr, "Group name " + groupname + " does not exist in the database"
+	sys.exit(1)
 else:
-        print "\tProjects will be linked to all users."
-        link_to_all_users = True
+	group_id = int(row[0])
 
-# Usernames to be linked to the projects
-linked_users = {}
-if link_to_all_users:
-        select = 'SELECT u.id, u.name FROM "user" u'
-        c.execute( select )
-        rows = c.fetchall()
-        if len( rows ) == 0:
-                print >> sys.stderr, "No users found. Aborting"
-                sys.exit( 1 )
-        for r in rows:
-                linked_users[ r[1] ] = r[0]
+# Get the content type id for CATMAID projets
+select = 'SELECT ct.id FROM "django_content_type" ct WHERE ct.name = %s AND ct.app_label = %s AND model = %s'
+c.execute( select, ("project", "catmaid", "project") )
+row = c.fetchone()
+if not row:
+	print >> sys.stderr, "Could not find content type ID for CATMAID projects. Exiting."
+	sys.exit(1)
 else:
-        linked_users_input = True
-        # Ask for the users to be linked to the project and check if names exist
-        while not linked_users:
-                users = raw_input("What are the users that should be linked to the project? ")
-                if users == "":
-                        print "\tProject will only be linked to user \"" + username + "\""
-                        users = []
-                else:
-                        users = users.split(',')
-                if username not in users:
-                        users.append( username )
-                accepted = raw_input("The project will be linked to the following " + str(len(users)) + " users " + ', '.join( users ) + " -- alright? [y]/n: ")
-                linked_users_input = accepted in ('n', 'no', 'nop', 'nope')
-                if not linked_users_input:
-                        # Get the user ids
-                        for u in users:
-                                select = 'SELECT u.id FROM "user" u WHERE u.name = %s'
-                                c.execute(select, (u,) )
-                                row = c.fetchone()
-                                if not row:
-                                        print >> sys.stderr, "Username " + u + " does not exist in the database"
-                                        linked_users_input = True
-                                else:
-                                        linked_users[u] = row[0]
+	content_type_id = str(row[0])
+	print( "Found content type ID for CATMAID projects: " + content_type_id )
 
-# Clear DB if requested
-#if clear_db:
-#	clear = "DELETE FROM project_user"
-#	c.execute( clear )
-#	print 'deleted project_user table'
-#	clear = "DELETE FROM project_stack"
-#	c.execute( clear )
-#	print 'deleted project_stack table'
-#	clear = "DELETE FROM project"
-#	c.execute( clear )
-#	print 'deleted project table'
-#	clear = "DELETE FROM stack"
-#	c.execute( clear )
-#	print 'deleted stack table'
+# Ask for permissions to add
+select = 'SELECT ap.id, ap.name FROM "auth_permission" ap WHERE ap.content_type_id = %s'
+c.execute( select, ( content_type_id, ) )
+rows = c.fetchall()
+if not row:
+	print >> sys.stderr, "Could not find permission options for CATMAID projects. Exiting."
+	sys.exit(1)
+else:
+	print( "Please select the permissions you want to grant to the group:" )
+	for n, r in enumerate(rows):
+		print( str(n) + ") " + r[1] )
+	# Get a list of wanted permissions
+	permissions = raw_input( "Insert all permissions as comma seperated list (e.g. 1,2,3): " )
+	permissions = permissions.replace(" ", "").split(",")
+	permissions = [rows[int(p)][0] for p in permissions]
+	if len(permissions) == 0:
+		print( "Could not understand your permission selection list. Exiting." )
+		sys.exit(1)
+	print( "Using the following permission ids: " + str(permissions) )
 
 # Add all projects and stacks
 for p in projects:
@@ -286,12 +267,21 @@ for p in projects:
 	c.execute( insert, (name, projects_public) )
 	project_id = c.fetchone()[0]
 	print 'Added project ' + p + ' -- it got ID ' + str(project_id)
-	# Link users to project
-	for u in linked_users:
-		insert = 'INSERT INTO project_user (project_id, user_id) '
-		insert += 'VALUES (%s, %s)'
-		c.execute( insert, (project_id, linked_users[u]) )
-		print '\tlinked it to user ' + u + ' with ID ' + str(linked_users[u])
+
+	# Add permissions
+	for permission_id in permissions:
+		ggp_select = 'SELECT ggp.id FROM "guardian_groupobjectpermission" ggp WHERE '
+		ggp_select += 'ggp.permission_id = %s AND ggp.content_type_id = %s AND ggp.object_pk = %s AND group_id = %s'
+		c.execute( ggp_select, (permission_id, content_type_id, str(project_id), group_id) )
+		rows = c.fetchall()
+		if len(rows) > 0:
+			print( "Permissions already exist on project \"" + projects[project_id] + "\" (ID: " + str(project_id) + ")")
+		else:
+			insert = 'INSERT INTO guardian_groupobjectpermission (permission_id, content_type_id, object_pk, group_id) '
+			insert += 'VALUES (%s, %s, %s, %s)'
+			c.execute( insert, (permission_id, content_type_id, str(project_id), group_id) )
+			print( "Modified permissions on project \"" + name + "\" (ID: " + str(project_id) + ")")
+
 	# Add stacks
 	for s in projects[p]:
 		insert = 'INSERT INTO stack (title, dimension, resolution, image_base, comment, file_extension, num_zoom_levels, metadata) '
