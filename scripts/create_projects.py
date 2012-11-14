@@ -259,6 +259,16 @@ else:
 		sys.exit(1)
 	print( "Using the following permission ids: " + str(permissions) )
 
+# Ask for tags
+use tags = raw_input("Do you want to tag all projects with a set of tags? y/[n]: ")
+tags = []
+if projects_public in ('y', 'yes', 'ja', 'yeah'):
+	print "\tNo tags will be added."
+	use_tags = True
+else:
+	print "\tWill add tags to all projects (if entered)."
+	use_tags = False
+
 # Add all projects and stacks
 for p in projects:
 	# Add project
@@ -281,6 +291,10 @@ for p in projects:
 			insert += 'VALUES (%s, %s, %s, %s)'
 			c.execute( insert, (permission_id, content_type_id, str(project_id), group_id) )
 			print( "Modified permissions on project \"" + name + "\" (ID: " + str(project_id) + ")")
+
+    # Add tags
+    for tag in tags:
+        pass
 
 	# Add stacks
 	for s in projects[p]:
