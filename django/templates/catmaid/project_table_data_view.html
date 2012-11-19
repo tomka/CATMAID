@@ -43,6 +43,7 @@
 				<a href="{{ settings.CATMAID_URL }}{{ p.id }}">Neuron Catalogue</a>
 			</td>
 		{% endif %}
+		<td class="stackname"><a href="#" onclick="openProjectStack({{p.id}}, {{p.stacks.all.0.id}}, true)">Adjustable Composite</a></td>
 	</tr>
 	{% endif %}
 {% endfor %}

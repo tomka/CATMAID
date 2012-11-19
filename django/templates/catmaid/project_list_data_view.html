@@ -43,6 +43,7 @@
                 {% if p.is_catalogueable and catalogue_link %}
                     <dd><a href="{{ settings.CATMAID_URL }}{{ p.id }}">Browse the Neuron Catalogue</a></dd>
                 {% endif %}
+                <dd><a href="#" onclick="openProjectStack({{p.id}}, {{p.stacks.all.0.id}}, true)">Adjustable Composite</a></dd>
             </dl>
         </td></tr>
     {% endif %}
