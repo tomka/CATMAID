@@ -1,3 +1,5 @@
+import datetime
+
 from django.db import models
 from django.conf import settings
 from django.http import HttpResponse
@@ -86,10 +88,15 @@ def process( job ):
     composite_blob = Blob()
     composite.write( composite_blob )
 
+    # Let the image expire in one hour
+    expire_time = datetime.datetime.utcnow() + datetime.timedelta(minutes=60)
+    expire_time = expire_time.strftime('Expires %a, %d %b %Y %H:%M:%S GMT')
+
     # Return the actual file content
     response = HttpResponse( composite_blob.data )
     response['Content-Type'] = 'image/' + stack.file_extension
     response['Content-Disposition'] = 'attachment; filename="' + str(job.intensities[0]) + img_url  + '"'
+    response['Expires'] = expire_time
     response['Connection'] = 'close'
 
     return response
