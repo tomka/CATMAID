@@ -85,6 +85,7 @@ function ProcTileLayer(
     self.adjustable_stacks = new Array();
     for ( var s in stacks )
     {
+        var id = stacks[ s ].id;
         // slider for threshold values
         var threshold_container = document.createElement("div");
         var default_threshold = 0;
@@ -102,7 +103,7 @@ function ProcTileLayer(
                         threshold_handler );
 
         threshold_slider.setByValue( default_threshold, true );
-        threshold_slider.stackid = s;
+        threshold_slider.stackid = id;
         threshold_container.className = "IntensityBox";
         threshold_container.innerHTML += "Threshold of " + stacks[s].title + "<br />";
         threshold_container.appendChild( threshold_slider.getView() );
@@ -125,14 +126,14 @@ function ProcTileLayer(
                         intensity_handler );
 
         intensity_slider.setByValue( default_intensity, true );
-        intensity_slider.stackid = s;
+        intensity_slider.stackid = id;
         intensity_container.className = "IntensityBox";
         intensity_container.innerHTML += "Intensity of " + stacks[s].title + "<br />";
         intensity_container.appendChild( intensity_slider.getView() );
         view.appendChild( intensity_container );
 
         // fill stack data structure
-        self.adjustable_stacks[ s ] = {
+        self.adjustable_stacks[ id ] = {
             threshold : default_threshold,
             intensity : default_intensity,
             data : stacks[s],

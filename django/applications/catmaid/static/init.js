@@ -448,7 +448,7 @@ function updateProjectListFromCache() {
     // adjustable composite
     var dd = document.createElement("dd");
     var a_ct = document.createElement("a");
-    a_ct.href = "javascript:openProjectStack(" + p.pid + ", " + getFirstKey( projects_available[ p.pid ] ) +  ", true)"
+    a_ct.href = "javascript:openProjectStack(" + p.pid + ", " + projects_available[ p.pid ][0].id +  ", true)"
     a_ct.appendChild(document.createTextNode("Adjustable Composite"));
     dd.appendChild(a_ct);
     toappend.push(dd);

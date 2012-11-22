@@ -43,8 +43,9 @@ function DBThumbnailTool()
                 stack_ids += ","
                 stack_metadata += ","
             }
-            stack_ids += s.toString()
-            stack_metadata += projURL.replace( "sid0=" + stack.getId(), "sid0=" + s );
+            var id = stacks[ s ].id;
+            stack_ids += id.toString()
+            stack_metadata += projURL.replace( "sid0=" + stack.getId(), "sid0=" + id );
             nStacks++;
         }
         */
