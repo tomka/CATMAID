@@ -5,12 +5,11 @@ from datetime import datetime
 import sys
 import re
 import urllib
-
 from django.contrib.auth.models import User
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 
-from fields import Double3DFormField, Integer3DFormField
+from fields import Double3DFormField, Integer3DFormField, TextArrayField
 
 from guardian.shortcuts import get_objects_for_user
 
@@ -765,3 +764,33 @@ class DataView(models.Model):
                 dv.is_default = False
                 dv.save()
 
+class AnnotationTreeTemplateNode(models.Model):
+    class Meta:
+        db_table = 'annotation_tree_template_node'
+        managed = False
+        ordering = ('position',)
+    name = models.TextField()
+    class_names = TextArrayField()
+    exclusive = models.BooleanField(default=False)
+    parent = models.ForeignKey('self', null=True, blank=True, related_name='children')
+    relation_name = models.TextField(blank=True)
+
+    def __unicode__(self):
+        return self.name + ": " + str(self.class_names)
+
+class AnnotationTreeTemplate(models.Model):
+    class Meta:
+        db_table = 'annotation_tree_template'
+        managed = False
+    name = models.TextField()
+    rootnode = models.ForeignKey(AnnotationTreeTemplateNode)
+
+    def __unicode__(self):
+        return self.name
+
+class ProjectAnnotationTreeTemplate(models.Model):
+    class Meta:
+        db_table = 'project_annotation_tree_template'
+        managed = False
+    project = models.ForeignKey(Project)
+    annotation_tree_template = models.ForeignKey(AnnotationTreeTemplate)

@@ -1419,6 +1419,99 @@ WHERE code_type = 'project_table_data_view';
 "
 ),
 
+        '2012-11-27T13:55:00' => new Migration(
+                'Add annotation template tree tables',
+                "
+CREATE TABLE annotation_tree_template_node (
+id integer NOT NULL,
+name text NOT NULL,
+class_names text[] NOT NULL,
+parent_id integer,
+position integer NOT NULL,
+relation_name text NOT NULL,
+exclusive boolean DEFAULT false
+);
+CREATE TABLE annotation_tree_template (
+id integer NOT NULL,
+name text NOT NULL,
+rootnode_id integer NOT NULL
+);
+CREATE SEQUENCE annotation_tree_template_node_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+CREATE SEQUENCE annotation_tree_template_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+ALTER SEQUENCE annotation_tree_template_node_id_seq OWNED BY annotation_tree_template_node.id;
+ALTER SEQUENCE annotation_tree_template_id_seq OWNED BY annotation_tree_template.id;
+ALTER TABLE annotation_tree_template_node ALTER COLUMN id SET DEFAULT nextval('annotation_tree_template_node_id_seq'::regclass);
+ALTER TABLE annotation_tree_template ALTER COLUMN id SET DEFAULT nextval('annotation_tree_template_id_seq'::regclass);
+ALTER TABLE ONLY annotation_tree_template_node
+    ADD CONSTRAINT annotation_tree_template_node_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY annotation_tree_template
+    ADD CONSTRAINT annotation_tree_template_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY annotation_tree_template_node
+    ADD CONSTRAINT parent_id_fkey FOREIGN KEY (parent_id) REFERENCES annotation_tree_template_node(id);
+ALTER TABLE ONLY annotation_tree_template
+    ADD CONSTRAINT rootnode_id_fkey FOREIGN KEY (rootnode_id) REFERENCES annotation_tree_template_node(id);
+"
+),
+
+    '2012-12-03T16:26:45' => new Migration(
+        'Add table to linke annotation tree templates and projects',
+        "
+CREATE TABLE project_annotation_tree_template (
+id integer NOT NULL,
+project_id integer NOT NULL,
+annotation_tree_template_id integer NOT NULL,
+root_class_instance_id integer NOT NULL
+);
+CREATE SEQUENCE project_annotation_tree_template_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+ALTER SEQUENCE project_annotation_tree_template_id_seq OWNED BY project_annotation_tree_template.id;
+ALTER TABLE project_annotation_tree_template ALTER COLUMN id SET DEFAULT nextval('project_annotation_tree_template_id_seq'::regclass);
+ALTER TABLE ONLY project_annotation_tree_template
+    ADD CONSTRAINT project_id_fkey FOREIGN KEY (project_id) REFERENCES project(id);
+ALTER TABLE ONLY project_annotation_tree_template
+    ADD CONSTRAINT annotation_tree_template_id_fkey FOREIGN KEY (annotation_tree_template_id) REFERENCES annotation_tree_template(id);
+ALTER TABLE ONLY project_annotation_tree_template
+    ADD CONSTRAINT root_class_instance_id_fkey FOREIGN KEY (root_class_instance_id) REFERENCES class_instance(id);
+"
+),
+
+    '2012-12-05T16:08:45' => new Migration(
+        'Add table to link annotation tree template nodes and class instances',
+        "
+CREATE TABLE class_instance_annotation_tree_template_node (
+id integer NOT NULL,
+class_instance_id integer NOT NULL,
+annotation_tree_template_node_id integer NOT NULL
+);
+CREATE SEQUENCE class_instance_annotation_tree_template_node_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+ALTER SEQUENCE class_instance_annotation_tree_template_node_id_seq OWNED BY class_instance_annotation_tree_template_node.id;
+ALTER TABLE class_instance_annotation_tree_template_node ALTER COLUMN id SET DEFAULT nextval('class_instance_annotation_tree_template_node_id_seq'::regclass);
+ALTER TABLE ONLY class_instance_annotation_tree_template_node
+    ADD CONSTRAINT class_instance_id_fkey FOREIGN KEY (class_instance_id) REFERENCES class_instance(id);
+ALTER TABLE ONLY class_instance_annotation_tree_template_node
+    ADD CONSTRAINT annotation_tree_template_node_id_fkey FOREIGN KEY (annotation_tree_template_node_id) REFERENCES annotation_tree_template_node(id);
+"
+),
+
 	// INSERT NEW MIGRATIONS HERE
 	// (Don't remove the previous line, or inserting migration templates
 	// won't work.)

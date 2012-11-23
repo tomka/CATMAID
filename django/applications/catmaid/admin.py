@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.contrib import admin
 from django.utils.safestring import mark_safe
 from guardian.admin import GuardedModelAdmin
-from catmaid.models import Project, DataView, Stack, ProjectStack
+from catmaid.models import Project, DataView, Stack, ProjectStack, AnnotationTreeTemplate, AnnotationTreeTemplateNode
 
 class ProjectAdmin(GuardedModelAdmin):
     list_display = ('title', 'public', 'wiki_base_url')
@@ -80,7 +80,15 @@ class DataViewAdmin(GuardedModelAdmin):
         return super(DataViewAdmin, self).change_view(request, object_id,
             form_url, extra_context=extra_context)
 
+class AnnotationTreeTemplateAdmin(GuardedModelAdmin):
+    list_display = ('name', 'rootnode')
+
+class AnnotationTreeTemplateNodeAdmin(GuardedModelAdmin):
+    list_display = ('class_name', 'parent', 'relation_name')
+
 admin.site.register(Project, ProjectAdmin)
 admin.site.register(DataView, DataViewAdmin)
 admin.site.register(Stack, StackAdmin)
 admin.site.register(ProjectStack)
+admin.site.register(AnnotationTreeTemplate, AnnotationTreeTemplateAdmin)
+admin.site.register(AnnotationTreeTemplateNode, AnnotationTreeTemplateNodeAdmin)

@@ -243,6 +243,7 @@ function Project( pid )
 		document.getElementById( "project_menu_current" ).style.display = "none";
         // TODO: bars should be unset by tool on unregister
 		document.getElementById("toolbox_edit").style.display = "none";
+		document.getElementById("toolbox_classification").style.display = "none";
 		document.getElementById("toolbox_data").style.display = "none";
         document.getElementById( "toolbox_project" ).style.display = "none";
         document.getElementById( "toolbar_nav" ).style.display = "none";
@@ -260,11 +261,13 @@ function Project( pid )
 		editable = bool;
 		if (editable) {
 			document.getElementById("toolbox_edit").style.display = "block";
+			document.getElementById("toolbox_classification").style.display = "block";
 			document.getElementById("toolbox_data").style.display = "block";
 		}
 		else 
 		{
 			document.getElementById("toolbox_edit").style.display = "none";
+			document.getElementById("toolbox_classification").style.display = "none";
 			document.getElementById("toolbox_data").style.display = "none";
 		}
 		window.onresize();
