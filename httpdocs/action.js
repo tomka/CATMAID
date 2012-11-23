@@ -286,6 +286,20 @@ var editToolActions = [
 */
 ];
 
+var classificationToolActions = [
+
+  new Action({
+    helpText: "Show classification template tree editor",
+    buttonID: "classification_template_editor_button",
+    buttonName: 'classification_template_editor',
+    run: function (e) {
+      WindowMaker.show('classification-template-editor');
+      return true;
+    }
+  }),
+
+];
+
 var tracingWindowActions = [
 
   new Action({
