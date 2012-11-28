@@ -198,6 +198,7 @@ class Child:
         self.node_type = node_type
         self.child_nodes = {}
         self.template_node_id = -1
+        self.template_node_name = ""
 
 def get_children( parent_id, relation_map, max_nodes = 5000 ):
     """ Returns all children of a node with id <parent_id>. The result
@@ -245,6 +246,7 @@ def add_template_classes( child_list ):
         template_tree_node = ClassInstanceAnnotationTreeTemplateNode.objects.filter(
             class_instance=node.id)[0].annotation_tree_template_node
         node.template_node_id = template_tree_node.id
+        node.template_node_name = template_tree_node.name
         # Collect template tree child node properties
         for nc in template_tree_node.children.all():
             node.child_nodes[nc.id] = {
@@ -349,7 +351,7 @@ def classification_list(request, project_id=None):
         # TODO: When encountering a leaf node, "state" has to be omitted
 
         return HttpResponse(json.dumps(
-                    tuple({'data': {'title': child.title },
+                    tuple({'data': {'title': child.template_node_name + ": " + child.title },
                            'attr': {'id': 'node_%s' % child.id,
                                     'rel': child.node_type,
                                     'template_node_id': child.template_node_id,
