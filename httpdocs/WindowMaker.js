@@ -820,26 +820,22 @@ var WindowMaker = new function()
       return win;
   };
 
-  var createClassificationTemplateWidget = function()
+  var createClassificationWidget = function()
   {
-    var win = new CMWWindow( "Classification template tree editor" );
+    var win = new CMWWindow( "Classification tree editor" );
     var content = win.getFrame();
     content.style.backgroundColor = "#ffffff";
 
-    var container = createContainer( "object_tree_widget" );
+    var container = createContainer( "classification_editor_widget" );
     content.appendChild( container );
 
-    container.innerHTML =
-      '<input type="button" id="refresh_object_tree" value="refresh" style="display:block; float:left;" />' +
-      '&nbsp; Synchronize <input type="checkbox" id="synchronize_object_tree" checked="yes" />' +
-      '<br clear="all" />' +
-      '<div id="tree_object"></div>';
+    container.innerHTML = '<div id="classification_content"></div>';
 
     addListener(win, container);
 
     addLogic(win);
 
-    ObjectTree.init( project.getId() );
+    ClassificationObjectTree.init( project.getId() );
 
     return win;
   };
@@ -1074,7 +1070,7 @@ var WindowMaker = new function()
     "review-system": createReviewWindow,
     "connectivity-widget": createConnectivityWindow,
     "adjacencymatrix-widget": createAdjacencyMatrixWindow,
-    "classification-template-editor": createClassificationTemplateWidget
+    "classification-editor": createClassificationWidget
   };
 
   /** If the window for the given name is already showing, just focus it.
