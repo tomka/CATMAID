@@ -84,7 +84,24 @@ class AnnotationTreeTemplateAdmin(GuardedModelAdmin):
     list_display = ('name', 'rootnode')
 
 class AnnotationTreeTemplateNodeAdmin(GuardedModelAdmin):
-    list_display = ('class_name', 'parent', 'relation_name')
+    ordering = ('position',)
+    # Must be in sync with the jsTree based view (URL below)
+    list_display = ('pk', 'name', 'class_names', 'parent', 'position', 'relation_name')
+    raw_id_fields = ('parent',)
+    # we should have all objects on one page
+    list_per_page = 900
+    list_editable = ('name', 'class_names', 'position', 'parent')
+
+    def parent_id(self, obj):
+        return obj.parent and obj.parent_id or '0'
+
+    class Meta:
+        model = AnnotationTreeTemplateNode
+
+    class Media:
+        js = [settings.CATMAID_URL + 'libs/jquery/jquery.js',
+              settings.CATMAID_URL + 'libs/jquery/jquery.jstree.js',
+              settings.STATIC_URL + 'js/classification_tree_template_node_admin.js']
 
 admin.site.register(Project, ProjectAdmin)
 admin.site.register(DataView, DataViewAdmin)

@@ -773,6 +773,7 @@ class AnnotationTreeTemplateNode(models.Model):
     class_names = TextArrayField()
     exclusive = models.BooleanField(default=False)
     parent = models.ForeignKey('self', null=True, blank=True, related_name='children')
+    position = models.IntegerField();
     relation_name = models.TextField(blank=True)
 
     def __unicode__(self):
