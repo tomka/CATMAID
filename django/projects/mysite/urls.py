@@ -175,6 +175,16 @@ urlpatterns += patterns('',
     (r'^dataviews/type/comment$', 'catmaid.control.get_data_view_type_comment'),
     )
 
+# Classification trees
+urlpatterns += patterns('',
+    (r'^(?P<project_id>\d+)/class-tree/number$', 'catmaid.control.classification_tree_number'),
+    (r'^(?P<project_id>\d+)/class-tree/show$', 'catmaid.control.classification_display'),
+    (r'^(?P<project_id>\d+)/class-tree/new$', 'catmaid.control.add_new_classification'),
+    (r'^(?P<project_id>\d+)/class-tree/list$', 'catmaid.control.classification_list'),
+    (r'^(?P<project_id>\d+)/class-tree/instance-operation$', 'catmaid.control.classification_instance_operation'),
+    (r'^(?P<project_id>\d+)/class-tree/remove$', 'catmaid.control.remove_classification'),
+    )
+
 if settings.DEBUG:
     urlpatterns += patterns('',
                             (r'^static/(?P<path>.*)$',

@@ -794,3 +794,10 @@ class ProjectAnnotationTreeTemplate(models.Model):
         managed = False
     project = models.ForeignKey(Project)
     annotation_tree_template = models.ForeignKey(AnnotationTreeTemplate)
+
+class ClassInstanceAnnotationTreeTemplateNode(models.Model):
+    class Meta:
+        db_table = 'class_instance_annotation_tree_template_node'
+        managed = False
+    class_instance = models.ForeignKey(ClassInstance)
+    annotation_tree_template_node = models.ForeignKey(AnnotationTreeTemplateNode)

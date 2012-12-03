@@ -1,0 +1,18 @@
+{% load url from future %}
+<p>To create a new annotation tree, please select a template tree
+that you would like the new tree to be based on and click on
+"Create".</p>
+
+<form method="post" id="add-new-classification-form"
+      action="{% url 'catmaid.control.add_new_classification' project_id %}">
+    <p>
+    {{ new_tree_form }}
+    <input type="submit" value="Create" />
+    </p>
+</form>
+
+<p>Alternatively, you can link an existing classification tree to
+this project. If you want to do so, please select the tree below
+and click "Link".</p>
+
+[ToDo]
