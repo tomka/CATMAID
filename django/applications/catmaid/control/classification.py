@@ -199,6 +199,7 @@ class Child:
         self.child_nodes = {}
         self.template_node_id = -1
         self.template_node_name = ""
+        self.template_node_alt = []
 
 def get_children( parent_id, relation_map, max_nodes = 5000 ):
     """ Returns all children of a node with id <parent_id>. The result
@@ -247,6 +248,10 @@ def add_template_classes( child_list ):
             class_instance=node.id)[0].annotation_tree_template_node
         node.template_node_id = template_tree_node.id
         node.template_node_name = template_tree_node.name
+        # Add possible alternative types
+        for sibling in template_tree_node.class_names:
+            if sibling != node.class_name:
+                node.template_node_alt.append(sibling)
         # Collect template tree child node properties
         for nc in template_tree_node.children.all():
             node.child_nodes[nc.id] = {
@@ -355,6 +360,8 @@ def classification_list(request, project_id=None):
                            'attr': {'id': 'node_%s' % child.id,
                                     'rel': child.node_type,
                                     'template_node_id': child.template_node_id,
+                                    'template_node_name': child.template_node_name,
+                                    'template_node_alt': json.dumps(child.template_node_alt),
                                     'child_nodes': json.dumps(child.child_nodes)},
                            'state': 'open'} for child in child_nodes)))
 
@@ -366,7 +373,7 @@ def classification_list(request, project_id=None):
 def classification_instance_operation(request, project_id=None):
     params = {}
     int_keys = ('id', 'src', 'ref', 'parentid', 'relationnr', 'template_node_id')
-    str_keys = ('title', 'operation', 'title', 'rel', 'classname', 'relationname', 'objname', 'targetname')
+    str_keys = ('title', 'operation', 'title', 'rel', 'classname', 'relationname', 'objname', 'targetname', 'newtype')
     for k in int_keys:
         params[k] = int(request.POST.get(k, 0))
     for k in str_keys:
@@ -381,6 +388,8 @@ def classification_instance_operation(request, project_id=None):
     classification_instance_operation.res_on_err = ''
 
     def rename_node():
+        """ Will rename a node.
+        """
         can_edit_or_fail(request.user, params['id'], 'class_instance')
         # Do not allow '|' in name because it is used as string separator in NeuroHDF export
         if '|' in params['title']:
@@ -396,7 +405,46 @@ def classification_instance_operation(request, project_id=None):
         else:
             raise CatmaidException('Could not find any node with ID %s' % params['id'])
 
+    def retype_node():
+        """ Will create a new class instance with the requested type to replace
+        the current class instance.
+        """
+        can_edit_or_fail(request.user, params['id'], 'class_instance')
+        nodes_to_retype = ClassInstance.objects.filter(id=params['id'])
+        if len(nodes_to_retype) > 1:
+            raise CatmaidException('Can only re-type one class instance at a time.')
+        elif len(nodes_to_retype) == 0:
+            raise CatmaidException('Could not find any node with ID %s' % params['id'])
+        node = nodes_to_retype[0]
+        new_type = params['newtype']
+
+        # 1. Check if the retyping request is valid
+        classification_instance_operation.res_on_err = 'Failed to re-type node with ID %s' % node.id
+        template_tree_node = ClassInstanceAnnotationTreeTemplateNode.objects.filter(
+            class_instance=node.id)[0].annotation_tree_template_node
+        # Is it actually present in the template tree?
+        if new_type not in template_tree_node.class_names:
+            raise CatmaidException('The new type "%s" is no valid class name.' % new_type)
+        # Is there a class for it?
+        if new_type not in class_map:
+            raise CatmaidException('No class found with name "%s".' % new_type)
+        # Is there already a class instance named like this?
+        parent = ClassInstance.objects.filter(id=params['parentid'])[0]
+        cici_links = ClassInstanceClassInstance.objects.filter(class_instance_b=parent.id)
+        for cici in cici_links:
+            if cici.class_instance_a.class_column.class_name == new_type:
+                raise CatmaidException('A class instance of type "%s" already exists.' % new_type)
+
+        # 2. Assign new type name to class instance
+        node.name = new_type
+        node.class_column_id = class_map[new_type]
+        node.save()
+
+        return HttpResponse(json.dumps({'class_instance_id': node.id}))
+
     def remove_node():
+        """ Will remove a node.
+        """
         # Can only remove the node if the user owns it or the user is a superuser
         can_edit_or_fail(request.user, params['id'], 'class_instance')
         # Check if node is a skeleton. If so, we have to remove its treenodes as well!
@@ -501,7 +549,7 @@ def classification_instance_operation(request, project_id=None):
 
     try:
         # Dispatch to operation
-        if params['operation'] not in ['rename_node', 'remove_node', 'create_node', 'move_node', 'has_relations']:
+        if params['operation'] not in ['rename_node', 'remove_node', 'create_node', 'move_node', 'has_relations', 'retype_node']:
             raise CatmaidException('No operation called %s.' % params['operation'])
         return locals()[params['operation']]()
 
