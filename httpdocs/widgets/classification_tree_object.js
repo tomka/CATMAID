@@ -196,6 +196,51 @@ var ClassificationObjectTree = new function()
                 }
               };
           } else if (type_of_node === "element") {
+            var template_node_name = obj.attr("template_node_name");
+            var template_node_alt = JSON.parse(obj.attr("template_node_alt"));
+            // Build changing submenu
+            submenu = {}
+            for(i=0; i < template_node_alt.length; i++){
+                var alternative = template_node_alt[i];
+                var parent = obj.parents("li:eq(0)");
+                submenu['change_to_alt_' + i] = {
+                    "separator_before": false,
+                    "separator_after": false,
+                    "label": alternative,
+                    // the action function has to be created wth. of a closure
+                    "action": (function(name) { return function (obj) {
+                      data = {
+                        "operation": "retype_node",
+                        "newtype": name,
+                        "id": obj.attr("id").replace("node_", ""),
+                        "parentid": parent.attr("id").replace("node_", ""),
+                      };
+
+                      $.ajax({
+                        async: false,
+                        cache: false,
+                        type: 'POST',
+                        url: django_url + project.id + '/class-tree/instance-operation',
+                        data: data,
+                        dataType: 'json',
+                        success: function () {
+                          // reload the node
+                          // TODO: Refresh only the sub tree, startins from parent
+                          tree.jstree("refresh", -1);
+                        }
+                      });
+                    }})(alternative)
+                };
+            }
+
+            // Add changing entry
+            menu["change_element"] = {
+                "separator_before": true,
+                "separator_after": false,
+                "_disabled": (submenu.length == 0),
+                "label": "Change " + template_node_name,
+                "submenu": submenu
+            };
             // Add removing entry
             menu["remove_element"] = {
                 "separator_before": true,
@@ -204,7 +249,7 @@ var ClassificationObjectTree = new function()
                 "action": function (obj) {
                   this.remove(obj);
                 }
-              };
+            };
           }
           return menu;
         }
