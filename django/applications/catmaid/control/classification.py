@@ -356,7 +356,7 @@ def classification_list(request, project_id=None):
         # TODO: When encountering a leaf node, "state" has to be omitted
 
         return HttpResponse(json.dumps(
-                    tuple({'data': {'title': child.template_node_name + ": " + child.title },
+                    tuple({'data': {'title': child.title },
                            'attr': {'id': 'node_%s' % child.id,
                                     'rel': child.node_type,
                                     'template_node_id': child.template_node_id,
