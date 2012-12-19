@@ -134,7 +134,7 @@ var ClassificationObjectTree = new function()
         "items": function (obj) {
           var id_of_node = obj.attr("id");
           var type_of_node = obj.attr("rel");
-          var template_node_id = obj.attr("template_node_id");
+          var class_id = obj.attr("classid");
           var child_nodes = JSON.parse(obj.attr("child_nodes"));
           var menu = {};
           // Add entries to create child classes.
@@ -166,7 +166,7 @@ var ClassificationObjectTree = new function()
                     "state": "open",
                     "data": name,
                     "attr": {
-                        "template_node_id": tn_id,
+                        "classid": tn_id,
                         "classname": name,
                         "relname": child.rel_name,
                         //"rel": type_of_node,
@@ -196,8 +196,8 @@ var ClassificationObjectTree = new function()
                 }
               };
           } else if (type_of_node === "element") {
-            var template_node_name = obj.attr("template_node_name");
-            var template_node_alt = JSON.parse(obj.attr("template_node_alt"));
+            var template_node_name = obj.attr("classname");
+            var template_node_alt = JSON.parse(obj.attr("classalt"));
             // Build changing submenu
             submenu = {}
             for(i=0; i < template_node_alt.length; i++){
@@ -361,7 +361,7 @@ var ClassificationObjectTree = new function()
       data = {
         "operation": "create_node",
         "parentid": data.rslt.parent.attr("id").replace("node_", ""),
-        "template_node_id": data.rslt.obj.attr("template_node_id"),
+        "classid": data.rslt.obj.attr("classid"),
         "classname": data.rslt.obj.attr("classname"),
         "relationname": data.rslt.obj.attr("relname"),
         "objname": data.rslt.name,
@@ -418,7 +418,7 @@ var ClassificationObjectTree = new function()
       $.post(django_url + project.id + '/class-tree/instance-operation', {
             "operation": "has_relations",
             "relationnr": 1,
-            "relation0": "part_of",
+            "relation0": "has_a",
             "id": data.rslt.obj.attr("id").replace("node_", ""),
             "pid": pid
         }, function (r) {
