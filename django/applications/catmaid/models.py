@@ -256,6 +256,9 @@ class Class(models.Model):
     class_name = models.CharField(max_length=255)
     description = models.TextField()
 
+    def __unicode__(self):
+        return self.class_name
+
 class ConnectivityDirection:
     PRESYNAPTIC_PARTNERS = 0
     POSTSYNAPTIC_PARTNERS = 1
@@ -413,6 +416,9 @@ class Relation(models.Model):
     description = models.TextField()
     isreciprocal = models.BooleanField()
 
+    def __unicode__(self):
+        return self.relation_name
+
 class RelationInstance(models.Model):
     class Meta:
         db_table = "relation_instance"
@@ -465,6 +471,9 @@ class ClassClass(models.Model):
                                 db_column='class_a')
     class_b = models.ForeignKey(Class, related_name='classes_b',
                                 db_column='class_b')
+
+    def __unicode__(self):
+        return self.class_a.class_name + " " + self.relation.relation_name + " " + self.class_b.class_name
 
 class Message(models.Model):
     class Meta:

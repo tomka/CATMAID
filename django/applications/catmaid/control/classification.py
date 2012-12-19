@@ -12,19 +12,35 @@ from catmaid.control.authentication import *
 from catmaid.control.common import *
 from catmaid.transaction import *
 
-def get_classification_tree_number( project_id ):
+def get_classification_root_node_ids( dummy_project_id=-1):
+    """ Returns a list with IDs of all classes that are connected
+    with a IS_A relation to to the 'classification_root' class.
+    """
+    root_class = Class.objects.filter(class_name='classification_root',
+        project_id=dummy_project_id)
+    relation = Relation.objects.filter(relation_name='is_a',
+        project_id=dummy_project_id)
+    cc_relations = ClassClass.objects.filter(class_b = root_class,
+        project_id=dummy_project_id, relation=relation)
+    class_ids = [ o.class_a.id for o in cc_relations ]
+
+    return class_ids
+
+def get_classification_tree_number( project_id, dummy_project_id=-1 ):
     """ Returns the number of annotation trees, linked to a project.
     """
-    class_map = get_class_to_id_map(project_id)
-    if 'root' not in class_map:
-        num_trees = 0
+    class_ids = get_classification_root_node_ids( dummy_project_id )
+
+    if len(class_ids) == 0:
+        # If there are no root node classes, there can't be a tree
+        return 0
     else:
-        parent_id = 0
+        # Count the number of root nodes the current project has
+        # instances of.
         root_node_q = ClassInstance.objects.filter(
             project=project_id,
-            class_column=class_map['root'])
-        num_trees = root_node_q.count()
-    return num_trees
+            class_column__in=class_ids)
+        return root_node_q.count()
 
 @requires_user_role([UserRole.Annotate, UserRole.Browse])
 @report_error
@@ -46,12 +62,12 @@ def classification_display(request, project_id=None):
 
     context = Context({
         'num_trees': num_trees,
-        'template_trees': template_trees,
         'project_id': project_id,
         'CATMAID_DJANGO_URL': settings.CATMAID_DJANGO_URL
     })
 
     if num_trees == 0:
+        NewClassificationForm = classification_form_factory()
         context['new_tree_form'] = NewClassificationForm()
         template = Template("""
         <p>There is currently no annotation tree associated with this
@@ -76,101 +92,49 @@ def remove_classification( request, project_id=None ):
     class_instances = ClassInstance.objects.filter(project=project_id)
 
     for ci in class_instances:
-        # Delete link to template node
-        ClassInstanceAnnotationTreeTemplateNode.objects.filter(class_instance=ci.id)[0].delete()
-        # Delete class instance
         ci.delete()
-
-    template_tree_link = ProjectAnnotationTreeTemplate.objects.filter(project=project_id)
-    template_tree_link.delete()
 
     return HttpResponse('The classification tree has been removed.')
 
-def traverse_template_tree( node, method, level = 1 ):
-    """ Traverses the given template tree and calls the
-    given method for every node.
-    """
-    method( node )
-    for child in node.children.all():
-        traverse_template_tree( child, method, level + 1 )
-
-def init_classification( user, project, template_tree ):
+def init_classification( user, project, root_class, dummy_project_id=-1 ):
     """ Initializes a classification for a project based on
     a particular template tree.
     ToDo: Maybe all this should be done in one transaction.
     """
-    relation_map = get_relation_to_id_map(project.id)
-    class_map = get_class_to_id_map(project.id)
+    relation_map = get_relation_to_id_map(dummy_project_id)
+    class_map = get_class_to_id_map(dummy_project_id)
 
     # Create needed classes for project: root + all of template
 
-    if 'root' not in class_map:
-        root_class = Class(
-                user = user,
-                class_name = "root",
-                description ="Root node")
-        root_class.project_id = project.id
-        root_class.save()
-        root_class_id = root_class.id
-    else:
-        root_class_id = class_map['root']
+    if root_class.class_name not in class_map:
+        raise CatmaidException("Couldn't find root class: %s" % root_class)
 
-    def add_class_names_and_relation( node ):
-        """ Adds all the class names in this node to this project
-        as well as the relation they should be linked to a parent.
-        """
-        # Class names
-        for cn in node.class_names:
-            # Add the class if it doesn't exist yet
-            if cn not in class_map:
-                new_class = Class(
-                    user = user,
-                    class_name = cn,
-                    description = "")
-                new_class.project_id = project.id
-                new_class.save()
-        # Add relation if it doesn't exist yet
-        if node.relation_name not in relation_map:
-            new_relation = Relation(
-                user = user,
-                relation_name = node.relation_name,
-                uri = "",
-                description = "",
-                isreciprocal = False)
-            new_relation.project_id = project.id
-            new_relation.save()
-
-    traverse_template_tree( template_tree.rootnode, add_class_names_and_relation )
+    root_class_id = class_map[root_class.class_name]
 
     # Create needed class_instances for project: root
-    node = ClassInstance(
-            user = user,
-            name = "Root")
+    node = ClassInstance(user = user, name = "Root")
     node.project_id = project.id
     node.class_column_id = root_class_id
     node.save()
-    # Link the node to a template tree node
-    ci_t_link = ClassInstanceAnnotationTreeTemplateNode()
-    ci_t_link.class_instance_id = node.id
-    ci_t_link.annotation_tree_template_node_id = template_tree.rootnode.id
-    ci_t_link.save()
-    # Link the template tree choice to the project
-    p_t_link = ProjectAnnotationTreeTemplate()
-    p_t_link.project_id = project.id
-    p_t_link.annotation_tree_template_id = template_tree.id
-    p_t_link.save()
     # Remember this initalization in the log
     insert_into_log(project.id, user.id, "create_root", None, "Created root with ID %s" % node.id)
 
-class NewClassificationForm(forms.Form):
-    """ A simple form to select template trees.
+def classification_form_factory( dummy_project_id=-1 ):
+    """ A factory method to create a classification form class.
     """
-    template_tree = forms.ModelChoiceField(
-        queryset=AnnotationTreeTemplate.objects.all())
+    class_ids = get_classification_root_node_ids( dummy_project_id )
+    ontologies = Class.objects.filter(pk__in=class_ids)
+    properties = {
+       'template_tree' : forms.ModelChoiceField(
+            queryset=ontologies)
+    }
+
+    return type('NewClassificationForm', (forms.Form,), properties)
 
 @requires_user_role([UserRole.Annotate, UserRole.Browse])
 def add_new_classification(request, project_id=None):
     # Has the form been submitted?
+    NewClassificationForm = classification_form_factory()
     if request.method == 'POST':
         form = NewClassificationForm(request.POST)
         if form.is_valid():
@@ -187,21 +151,20 @@ def add_new_classification(request, project_id=None):
         "new_tree_form": form,
     })
 
-class Child:
+class ClassNode:
     """ Keeps the class instance ID, title, node type and
     template id as well as template childs of a node.
     """
-    def __init__(self, id, title, class_name, node_type="element" ):
+    def __init__(self, id, title, class_name, class_id, node_type="element" ):
         self.id = id
         self.title = title
         self.class_name = class_name
+        self.class_id = class_id
         self.node_type = node_type
         self.child_nodes = {}
-        self.template_node_id = -1
-        self.template_node_name = ""
-        self.template_node_alt = []
+        self.class_alt = []
 
-def get_children( parent_id, relation_map, max_nodes = 5000 ):
+def get_instance_children( parent_id, relation_map, max_nodes = 5000 ):
     """ Returns all children of a node with id <parent_id>. The result
     is limited to a maximum ef <max_nodes> nodes.
     """
@@ -213,7 +176,8 @@ def get_children( parent_id, relation_map, max_nodes = 5000 ):
             SELECT ci.id,
                    ci.name,
                    "auth_user".username AS username,
-                   cl.class_name
+                   cl.class_name,
+                   cl.id
             FROM class_instance AS ci
                 INNER JOIN class_instance_class_instance AS cici
                 ON ci.id = cici.class_instance_a
@@ -226,59 +190,76 @@ def get_children( parent_id, relation_map, max_nodes = 5000 ):
             ORDER BY ci.name ASC
             LIMIT %s''', (
         parent_id,
-        relation_map['part_of'],
+        relation_map['has_a'],
         max_nodes))
 
     # Collect all child node class instances
     child_nodes = []
     for row in c.fetchall():
-        child = Child(row[0], row[1], row[3])
+        child = ClassNode(row[0], row[1], row[3], row[4])
         child_nodes.append( child )
 
     return child_nodes
 
-def add_template_classes( child_list ):
-    """ Adds all possible child nodes according to the each
-    given node as attribute.
+def add_class_info( node, dummy_project_id=-1 ):
+    """ Adds alternatives to the current node and all possible child nodes
+    to the node.
     """
-    # Add all template node child nodes
-    for node in child_list:
-        # Get template tree nodes
-        template_tree_node = ClassInstanceAnnotationTreeTemplateNode.objects.filter(
-            class_instance=node.id)[0].annotation_tree_template_node
-        node.template_node_id = template_tree_node.id
-        node.template_node_name = template_tree_node.name
-        # Add possible alternative types
-        for sibling in template_tree_node.class_names:
-            if sibling != node.class_name:
-                node.template_node_alt.append(sibling)
+    
+    # Get relation that identifies sub-types: is_a
+    is_a = Relation.objects.filter(relation_name='is_a', project_id=dummy_project_id)
+
+    # Add possible alternative classes
+    parent_link = ClassClass.objects.filter(class_a_id=node.class_id, relation=is_a)
+    if parent_link.count() == 1:
+        parent_link = parent_link[0]
+        parent = parent_link.class_b
+    else:
+        raise CatmaidException("Can not select parent of class '%s'" % node.class_name)
+
+    # Get all sibling links from this parent
+    sibling_links = ClassClass.objects.filter(class_b=parent_link.class_b, relation=is_a)
+    # Add all possible alternative classes
+    for sl in sibling_links:
+        # Make sure we don't add our self
+        if sl.class_a_id != node.class_id:
+            node.class_alt.append(sl.class_a.class_name)
+
+    # Get relation that identifies children: has_a
+    has_a = Relation.objects.filter(relation_name='has_a', project_id=dummy_project_id)
+    # Get all child nodes in class hierarchy
+    child_links = ClassClass.objects.filter(class_a_id__in=[node.class_id, parent.id], relation=has_a)
+    for cl in child_links:
+        child = cl.class_b
+        # Get possible sub-types of class
+        child_types = ClassClass.objects.filter(class_b_id=child.id, relation=is_a)
+        class_children = []
+        for sub_type in child_types:
+            class_children.append(sub_type.class_a.class_name)
+        exclusive = False
         # Collect template tree child node properties
-        for nc in template_tree_node.children.all():
-            node.child_nodes[nc.id] = {
-                'name': nc.name,
-                'class_names': nc.class_names,
-                'class_instances': [],
-                'exclusive': nc.exclusive,
-                'rel_name': nc.relation_name}
+        node.child_nodes[child.id] = {
+            'name': child.class_name,
+            'class_names': class_children,
+            'class_instances': [],
+            'exclusive': exclusive,
+            'rel_name': 'has_a'}
 
-    return child_list
+    return node
 
-def add_template_fields( child_list, relation_map ):
+def add_instance_info( child_list, relation_map ):
     """ Adds template information to the child list. Concept
     information as well as instance information is added.
     """
     # Add basic template information
-    child_list = add_template_classes( child_list )
     # Get children of every children. This is needed to tell the user,
     # what options (s)he still has to alter the tree.
     for node in child_list:
-        sub_children = get_children( node.id, relation_map )
+        add_class_info( node )
+        sub_children = get_instance_children( node.id, relation_map )
         for sub_child in sub_children:
-            # Get template tree nodes
-            template_tree_node = ClassInstanceAnnotationTreeTemplateNode.objects.filter(
-                class_instance=sub_child.id)[0].annotation_tree_template_node
             # Add this instance to the node
-            instance_list = node.child_nodes[template_tree_node.id]['class_instances']
+            instance_list = node.child_nodes[sub_child.class_id]['class_instances']
             instance_list.append( sub_child.class_name )
 
     return child_list
@@ -296,25 +277,20 @@ def classification_list(request, project_id=None):
         expand_request = tuple(int(x) for x in expand_request.split(','))
 
     max_nodes = 5000  # Limit number of nodes retrievable.
+    dummy_project_id = -1
 
-    relation_map = get_relation_to_id_map(project_id)
-    class_map = get_class_to_id_map(project_id)
+    relation_map = get_relation_to_id_map(dummy_project_id)
+    class_map = get_class_to_id_map(dummy_project_id)
 
-    if 'root' not in class_map:
-        raise CatmaidException('Can not find "root" class for this project')
+    # TODO: have this dynamic
+    root_class = "testis_classification_root"
+
+    if root_class not in class_map:
+        raise CatmaidException("Can not find '%s' class for this project" % root_class)
 
     #for relation in ['model_of', 'part_of']:
     #    if relation not in relation_map:
     #        raise CatmaidException('Can not find "%s" relation for this project' % relation)
-
-    # Get the template tree
-    template_tree_set = ProjectAnnotationTreeTemplate.objects.filter(project=project_id)
-    if template_tree_set == None:
-        raise CatmaidException('Can not find a linked template tree')
-    elif len(template_tree_set) > 1:
-        raise CatmaidException('Found more than one linked template trees')
-    else:
-        template_tree = template_tree_set[0].annotation_tree_template
 
     # Find all the relations that are defined in it
     # ToDo: Maybe caching should be added
@@ -323,10 +299,11 @@ def classification_list(request, project_id=None):
     response_on_error = ''
     try:
         if 0 == parent_id:
-            response_on_error = 'Could not select the id of the root node.'
+            response_on_error = 'Could not select the id of the root node'
+            root_class_id = class_map[root_class]
             root_node_q = ClassInstance.objects.filter(
                 project=project_id,
-                class_column=class_map['root'])
+                class_column=root_class_id)
 
             if 0 == root_node_q.count():
                 root_id = 0
@@ -337,21 +314,21 @@ def classification_list(request, project_id=None):
                 root_name = root_node.name
 
             # Collect all child node class instances
-            child = Child( root_id, root_name, "root", 'root')
-            add_template_fields( [child], relation_map )
+            child = ClassNode( root_id, root_name, root_class, root_class_id, 'root')
+            add_instance_info( [child], relation_map )
 
             return HttpResponse(json.dumps([{
                 'data': {'title': child.title},
                 'attr': {'id': 'node_%s' % child.id,
                          'rel': child.node_type,
-                         'template_node_id': template_tree.rootnode.id,
+                         'classid': child.class_id,
                          'child_nodes': json.dumps(child.child_nodes)},
                 'state': 'closed'}]))
 
         response_on_error = 'Could not retrieve child nodes.'
 
-        child_nodes = get_children( parent_id, relation_map )
-        add_template_fields( child_nodes, relation_map )
+        child_nodes = get_instance_children( parent_id, relation_map )
+        add_instance_info( child_nodes, relation_map )
 
         # TODO: When encountering a leaf node, "state" has to be omitted
 
@@ -359,9 +336,9 @@ def classification_list(request, project_id=None):
                     tuple({'data': {'title': child.title },
                            'attr': {'id': 'node_%s' % child.id,
                                     'rel': child.node_type,
-                                    'template_node_id': child.template_node_id,
-                                    'template_node_name': child.template_node_name,
-                                    'template_node_alt': json.dumps(child.template_node_alt),
+                                    'classid': child.class_id,
+                                    'classname': child.class_name,
+                                    'classalt': json.dumps(child.class_alt),
                                     'child_nodes': json.dumps(child.child_nodes)},
                            'state': 'open'} for child in child_nodes)))
 
@@ -372,16 +349,18 @@ def classification_list(request, project_id=None):
 @transaction_reportable_commit_on_success
 def classification_instance_operation(request, project_id=None):
     params = {}
-    int_keys = ('id', 'src', 'ref', 'parentid', 'relationnr', 'template_node_id')
+    int_keys = ('id', 'src', 'ref', 'parentid', 'relationnr', 'classid')
     str_keys = ('title', 'operation', 'title', 'rel', 'classname', 'relationname', 'objname', 'targetname', 'newtype')
     for k in int_keys:
         params[k] = int(request.POST.get(k, 0))
     for k in str_keys:
         # TODO sanitize
         params[k] = request.POST.get(k, 0)
- 
-    relation_map = get_relation_to_id_map(project_id)
-    class_map = get_class_to_id_map(project_id)
+
+    dummy_project_id = -1
+
+    relation_map = get_relation_to_id_map(dummy_project_id)
+    class_map = get_class_to_id_map(dummy_project_id)
 
     # We avoid many try/except clauses by setting this string to be the
     # response we return if an exception is thrown.
@@ -420,11 +399,6 @@ def classification_instance_operation(request, project_id=None):
 
         # 1. Check if the retyping request is valid
         classification_instance_operation.res_on_err = 'Failed to re-type node with ID %s' % node.id
-        template_tree_node = ClassInstanceAnnotationTreeTemplateNode.objects.filter(
-            class_instance=node.id)[0].annotation_tree_template_node
-        # Is it actually present in the template tree?
-        if new_type not in template_tree_node.class_names:
-            raise CatmaidException('The new type "%s" is no valid class name.' % new_type)
         # Is there a class for it?
         if new_type not in class_map:
             raise CatmaidException('No class found with name "%s".' % new_type)
@@ -459,8 +433,6 @@ def classification_instance_operation(request, project_id=None):
                 for rel in cici:
                     # Delete children
                     delete_node( rel.class_instance_a )
-                # Delete link to template node
-                ClassInstanceAnnotationTreeTemplateNode.objects.filter(class_instance=node.id)[0].delete()
                 # Delete class instance
                 node.delete()
                 # Log
@@ -506,6 +478,7 @@ def classification_instance_operation(request, project_id=None):
         if 0 == params['parentid']:
             # Find root element
             classification_instance_operation.res_on_err = 'Failed to select root.'
+            raise CatmaidException("Root selection not implemented yet.")
             node_parent_id = ClassInstance.objects.filter(
                     project=project_id,
                     class_column=class_map['root'])[0].id
@@ -521,13 +494,6 @@ def classification_instance_operation(request, project_id=None):
         cici.class_instance_a_id = node.id
         cici.class_instance_b_id = node_parent_id
         cici.save()
-
-        classification_instance_operation.res_on_err = 'Failed to insert link.'
-        # Link the node to a template tree node
-        ci_t_link = ClassInstanceAnnotationTreeTemplateNode()
-        ci_t_link.class_instance_id = node.id
-        ci_t_link.annotation_tree_template_node_id = int(params['template_node_id'])
-        ci_t_link.save()
 
         return HttpResponse(json.dumps({'class_instance_id': node.id}))
 

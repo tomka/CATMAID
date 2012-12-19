@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.contrib import admin
 from django.utils.safestring import mark_safe
 from guardian.admin import GuardedModelAdmin
-from catmaid.models import Project, DataView, Stack, ProjectStack, AnnotationTreeTemplate, AnnotationTreeTemplateNode
+from catmaid.models import Project, DataView, Stack, ProjectStack, Class, ClassClass, AnnotationTreeTemplate, AnnotationTreeTemplateNode
 
 class ProjectAdmin(GuardedModelAdmin):
     list_display = ('title', 'public', 'wiki_base_url')
@@ -103,9 +103,46 @@ class AnnotationTreeTemplateNodeAdmin(GuardedModelAdmin):
               settings.CATMAID_URL + 'libs/jquery/jquery.jstree.js',
               settings.STATIC_URL + 'js/classification_tree_template_node_admin.js']
 
+class ClassProxy(Class):
+    class Meta:
+        proxy = True
+        app_label = Class._meta.app_label
+
+class ClassProxyAdmin(GuardedModelAdmin):
+    list_display = ('pk', 'class_name', 'classes_b')
+    class Meta:
+        model = ClassProxy
+
+    class Media:
+        js = [settings.CATMAID_URL + 'libs/jquery/jquery.js',
+              settings.CATMAID_URL + 'libs/jquery/jquery.jstree.js',
+              settings.STATIC_URL + 'js/classification_tree_template_node_admin.js']
+
+class ClassClassProxyAdminB(GuardedModelAdmin):
+    ordering = ('position',)
+    # Must be in sync with the jsTree based view (URL below)
+    list_display = ('pk', 'name', 'class_names', 'parent', 'position', 'relation_name')
+    raw_id_fields = ('parent',)
+    # we should have all objects on one page
+    list_per_page = 900
+    list_editable = ('name', 'class_names', 'position', 'parent')
+
+    def parent_id(self, obj):
+        return obj.parent and obj.parent_id or '0'
+
+    class Meta:
+        model = AnnotationTreeTemplateNode
+
+    class Media:
+        js = [settings.CATMAID_URL + 'libs/jquery/jquery.js',
+              settings.CATMAID_URL + 'libs/jquery/jquery.jstree.js',
+              settings.STATIC_URL + 'js/classification_tree_template_node_admin.js']
+
 admin.site.register(Project, ProjectAdmin)
 admin.site.register(DataView, DataViewAdmin)
 admin.site.register(Stack, StackAdmin)
 admin.site.register(ProjectStack)
+admin.site.register(ClassClass)
+admin.site.register(ClassProxy, ClassProxyAdmin)
 admin.site.register(AnnotationTreeTemplate, AnnotationTreeTemplateAdmin)
 admin.site.register(AnnotationTreeTemplateNode, AnnotationTreeTemplateNodeAdmin)
