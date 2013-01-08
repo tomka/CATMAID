@@ -8,12 +8,16 @@
 {% with sample_width=config|get_or_none:"sample_width"|default_if_none:-1 %}
 {% with sample_height=config|get_or_none:"sample_height"|default_if_none:-1 %}
 
-<table>
 {% for p in projects %}
-	{% if p.stacks.count > 0 %}
+    {% if p.datasets.count > 0 %}
+        <h3>{{ p.title }}</h3>
+    {% endif %}
+    <table>
+    {% for dataset in p.datasets|order_by:"id" %}
+	{% if dataset.stacks.count > 0 %}
 	<tr>
-		<td class="projectname">{{ p.title }}</td>
-		{% for s in p.stacks|order_by:'id' %}
+		<td class="projectname">{{ dataset.title }}</td>
+		{% for s in dataset.stacks|order_by:'id' %}
 			{% if sample_images %}
 				<td class="stackimage">
 				{# Get the wanted slice #}
@@ -45,8 +49,9 @@
 		{% endif %}
 	</tr>
 	{% endif %}
+    {% endfor %}
+    </table>
 {% endfor %}
-</table>
 
 {% endwith %}
 {% endwith %}
