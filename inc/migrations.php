@@ -1434,6 +1434,66 @@ WHERE code_type = 'project_tags_data_view';
 "
 ),
 
+        '2013-01-08T10:08:48' => new Migration(
+                'Add dataset tables',
+                "
+CREATE TABLE dataset (
+    id integer NOT NULL,
+    title text NOT NULL
+);
+CREATE SEQUENCE dataset_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+ALTER SEQUENCE dataset_id_seq OWNED BY dataset.id;
+ALTER TABLE dataset ALTER COLUMN id SET DEFAULT nextval('dataset_id_seq'::regclass);
+ALTER TABLE ONLY dataset
+    ADD CONSTRAINT dataset_pkey PRIMARY KEY (id);
+
+CREATE TABLE project_dataset (
+    id integer NOT NULL,
+    project_id integer NOT NULL,
+    dataset_id integer NOT NULL
+);
+CREATE SEQUENCE project_dataset_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+ALTER SEQUENCE project_dataset_id_seq OWNED BY project_dataset.id;
+ALTER TABLE project_dataset ALTER COLUMN id SET DEFAULT nextval('project_dataset_id_seq'::regclass);
+ALTER TABLE ONLY project_dataset
+    ADD CONSTRAINT project_dataset_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY project_dataset
+    ADD CONSTRAINT project_id_fkey FOREIGN KEY (project_id) REFERENCES project(id);
+ALTER TABLE ONLY project_dataset
+    ADD CONSTRAINT dataset_id_fkey FOREIGN KEY (dataset_id) REFERENCES dataset(id);
+
+CREATE TABLE dataset_stack (
+    id integer NOT NULL,
+    dataset_id integer NOT NULL,
+    stack_id integer NOT NULL
+);
+CREATE SEQUENCE dataset_stack_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+ALTER SEQUENCE dataset_stack_id_seq OWNED BY dataset_stack.id;
+ALTER TABLE dataset_stack ALTER COLUMN id SET DEFAULT nextval('dataset_stack_id_seq'::regclass);
+ALTER TABLE ONLY dataset_stack
+    ADD CONSTRAINT dataset_stack_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY dataset_stack
+    ADD CONSTRAINT dataset_id_fkey FOREIGN KEY (dataset_id) REFERENCES dataset(id);
+ALTER TABLE ONLY dataset_stack
+    ADD CONSTRAINT stack_id_fkey FOREIGN KEY (stack_id) REFERENCES stack(id);
+"
+),
+
 	// INSERT NEW MIGRATIONS HERE
 	// (Don't remove the previous line, or inserting migration templates
 	// won't work.)
