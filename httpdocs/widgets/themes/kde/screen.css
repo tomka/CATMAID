@@ -29,6 +29,14 @@ h2
 	font-weight:bold;
 }
 
+h3
+{
+	margin:1.5em 16px 0.5em 20px;
+	font-size:12px;
+	line-height:1.1em;
+	font-weight:bold;
+}
+
 p, dl
 {
 	margin:1.5em 16px 0.5em 20px;
