@@ -171,6 +171,8 @@ class Project(models.Model):
     public = models.BooleanField(default=True)
     stacks = models.ManyToManyField("Stack",
                                     through='ProjectStack')
+    datasets = models.ManyToManyField("Dataset",
+                                      through='ProjectDataset')
     tags = TaggableManager(blank=True)
     
     def __unicode__(self):
@@ -188,6 +190,24 @@ class ProjectUser(models.Model):
     can_view_any = models.BooleanField(default=True)
     inverse_mouse_wheel = models.BooleanField(default=False)
 
+class Dataset(models.Model):
+    class Meta:
+        db_table = "dataset"
+        managed = False
+    title = models.TextField()
+    stacks = models.ManyToManyField("Stack",
+                                    through='DatasetStack')
+
+    def __inicode__(self):
+        return self.title
+
+class ProjectDataset(models.Model):
+    class Meta:
+        db_table = "project_dataset"
+        managed = False
+
+    project = models.ForeignKey(Project)
+    dataset = models.ForeignKey(Dataset)
 
 class Stack(models.Model):
     class Meta:
@@ -220,6 +240,16 @@ class ProjectStack(models.Model):
 
     def __unicode__(self):
         return self.project.title + " -- " + self.stack.title
+
+class DatasetStack(models.Model):
+    class Meta:
+        db_table = "dataset_stack"
+        managed = False
+    dataset = models.ForeignKey(Dataset)
+    stack = models.ForeignKey(Stack)
+
+    def __unicode__(self):
+        return self.dataset.title + " -- " + self.stack.title
 
 class Overlay(models.Model):
     class Meta:
