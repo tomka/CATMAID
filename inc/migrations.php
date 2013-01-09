@@ -1494,6 +1494,111 @@ ALTER TABLE ONLY dataset_stack
 "
 ),
 
+        // see: http://tech.jonathangardner.net/wiki/PostgreSQL/Materialized_Views
+        '2013-01-09T11:29:12' => new Migration(
+            'Add materialized view funcitonality',
+"
+CREATE TABLE matviews (
+  mv_name NAME NOT NULL PRIMARY KEY,
+  v_name NAME NOT NULL,
+  last_refresh TIMESTAMP WITH TIME ZONE
+);
+
+CREATE OR REPLACE FUNCTION create_matview(NAME, NAME)
+ RETURNS VOID
+ SECURITY DEFINER
+ LANGUAGE plpgsql AS '
+ DECLARE
+     matview ALIAS FOR $1;
+     view_name ALIAS FOR $2;
+     entry matviews%ROWTYPE;
+ BEGIN
+     SELECT * INTO entry FROM matviews WHERE mv_name = matview;
+     IF FOUND THEN
+         RAISE EXCEPTION ''Materialized view ''''%'''' already exists.'',
+           matview;
+     END IF;
+     EXECUTE ''REVOKE ALL ON '' || view_name || '' FROM PUBLIC'';
+     EXECUTE ''GRANT SELECT ON '' || view_name || '' TO PUBLIC'';
+     EXECUTE ''CREATE TABLE '' || matview || '' AS SELECT * FROM '' || view_name;
+     EXECUTE ''REVOKE ALL ON '' || matview || '' FROM PUBLIC'';
+     EXECUTE ''GRANT SELECT ON '' || matview || '' TO PUBLIC'';
+     INSERT INTO matviews (mv_name, v_name, last_refresh)
+       VALUES (matview, view_name, CURRENT_TIMESTAMP);
+     RETURN;
+ END';
+
+CREATE OR REPLACE FUNCTION drop_matview(NAME) RETURNS VOID
+ SECURITY DEFINER
+ LANGUAGE plpgsql AS '
+ DECLARE
+     matview ALIAS FOR $1;
+     entry matviews%ROWTYPE;
+ BEGIN
+
+     SELECT * INTO entry FROM matviews WHERE mv_name = matview;
+
+     IF NOT FOUND THEN
+         RAISE EXCEPTION ''Materialized view % does not exist.'', matview;
+     END IF;
+
+     EXECUTE ''DROP TABLE '' || matview;
+     DELETE FROM matviews WHERE mv_name=matview;
+
+     RETURN;
+ END
+ ';
+
+CREATE OR REPLACE FUNCTION refresh_matview(name) RETURNS VOID
+ SECURITY DEFINER
+ LANGUAGE plpgsql AS '
+ DECLARE
+     matview ALIAS FOR $1;
+     entry matviews%ROWTYPE;
+ BEGIN
+    SELECT * INTO entry FROM matviews WHERE mv_name = matview;
+    IF NOT FOUND THEN
+         RAISE EXCEPTION ''Materialized view % does not exist.'', matview;
+    END IF;
+    EXECUTE ''DELETE FROM '' || matview;
+    EXECUTE ''INSERT INTO '' || matview
+        || '' SELECT * FROM '' || entry.v_name;
+    UPDATE matviews
+        SET last_refresh=CURRENT_TIMESTAMP
+        WHERE mv_name=matview;
+    RETURN;
+END';
+"
+),
+
+/*
+        '2013-01-09T11:33:42' => new Migration(
+            'Add materialized view for project_dataset',
+"
+CREATE VIEW project_dataset_v AS
+SELECT DISTINCT
+  ps.project_id AS project_id,
+  ds.dataset_id AS dataset_id
+FROM dataset_stack ds INNER JOIN project_stack ps ON ds.stack_id = ps.stack_id;
+
+SELECT create_matview('project_dataset_mv', 'project_dataset_v');
+
+CREATE FUNCTION project_dataset_mv_refresh() RETURNS VOID
+ SECURITY DEFINER
+ LANGUAGE 'plpgsql' AS '
+ BEGIN
+     DELETE FROM project_dataset_mv;
+     INSERT INTO project_dataset_mv SELECT * FROM project_dataset_v;
+
+     UPDATE matviews
+         SET last_refresh = now()
+         WHERE mv_name = ''project_dataset_mv'';
+
+     RETURN;
+ END';
+"
+),
+*/
 	// INSERT NEW MIGRATIONS HERE
 	// (Don't remove the previous line, or inserting migration templates
 	// won't work.)
