@@ -797,6 +797,9 @@ class ProjectAnnotationTreeTemplate(models.Model):
     annotation_tree_template = models.ForeignKey(AnnotationTreeTemplate)
     root_class_instance = models.ForeignKey(ClassInstance)
 
+    def __unicode__(self):
+        return self.annotation_tree_template.name + " [" + self.project.title + "]"
+
 class ClassInstanceAnnotationTreeTemplateNode(models.Model):
     class Meta:
         db_table = 'class_instance_annotation_tree_template_node'
