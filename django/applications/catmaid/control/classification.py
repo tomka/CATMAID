@@ -59,11 +59,12 @@ def classification_display(request, project_id=None):
     elif num_trees == 1:
         template = loader.get_template( "catmaid/classification_tree.html" )
     else:
+        form = create_classification_form( project_id )
+        context['select_tree_form'] = form()
         template = Template("""
         <p>There are {{num_trees}} annotation trees associated
-        with this project. Please select which one you want to display.
-        </p>"
-        """)
+        with this project. Please select which one you want to display.</p>
+        {% include "catmaid/select_classification_tree.html" %}""")
 
     return HttpResponse( template.render( context ) )
 
@@ -167,6 +168,14 @@ class NewClassificationForm(forms.Form):
     """
     template_tree = forms.ModelChoiceField(
         queryset=AnnotationTreeTemplate.objects.all())
+
+def create_classification_form(project_id):
+    """ Creates a simple form  class to select available classifications.
+    """
+    class AvailableClassificationsForm(forms.Form):
+        classification_tree = forms.ModelChoiceField(
+                queryset=ProjectAnnotationTreeTemplate.objects.filter(project=project_id))
+    return AvailableClassificationsForm
 
 @requires_user_role([UserRole.Annotate, UserRole.Browse])
 def add_new_classification(request, project_id=None):
