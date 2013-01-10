@@ -16,13 +16,13 @@ def get_classification_tree_number( project_id ):
     """ Returns the number of annotation trees, linked to a project.
     """
     class_map = get_class_to_id_map(project_id)
-    if 'root' not in class_map:
+    if 'classification_root' not in class_map:
         num_trees = 0
     else:
         parent_id = 0
         root_node_q = ClassInstance.objects.filter(
             project=project_id,
-            class_column=class_map['root'])
+            class_column=class_map['classification_root'])
         num_trees = root_node_q.count()
     return num_trees
 
@@ -104,16 +104,16 @@ def init_classification( user, project, template_tree ):
 
     # Create needed classes for project: root + all of template
 
-    if 'root' not in class_map:
+    if 'classification_root' not in class_map:
         root_class = Class(
                 user = user,
-                class_name = "root",
-                description ="Root node")
-        root_class.project_id = project.id
+                class_name = "classification_root",
+                description ="Classification root node")
+        root_class.project_id = dummy_pid
         root_class.save()
         root_class_id = root_class.id
     else:
-        root_class_id = class_map['root']
+        root_class_id = class_map['classification_root']
 
     def add_class_names_and_relation( node ):
         """ Adds all the class names in this node to this project
@@ -300,8 +300,8 @@ def classification_list(request, project_id=None):
     relation_map = get_relation_to_id_map(project_id)
     class_map = get_class_to_id_map(project_id)
 
-    if 'root' not in class_map:
-        raise CatmaidException('Can not find "root" class for this project')
+    if 'classification_root' not in class_map:
+        raise CatmaidException('Can not find "classification_root" class for this project')
 
     #for relation in ['model_of', 'part_of']:
     #    if relation not in relation_map:
@@ -323,10 +323,10 @@ def classification_list(request, project_id=None):
     response_on_error = ''
     try:
         if 0 == parent_id:
-            response_on_error = 'Could not select the id of the root node.'
+            response_on_error = 'Could not select the id of the classification root node.'
             root_node_q = ClassInstance.objects.filter(
                 project=project_id,
-                class_column=class_map['root'])
+                class_column=class_map['classification_root'])
 
             if 0 == root_node_q.count():
                 root_id = 0
@@ -337,7 +337,7 @@ def classification_list(request, project_id=None):
                 root_name = root_node.name
 
             # Collect all child node class instances
-            child = Child( root_id, root_name, "root", 'root')
+            child = Child( root_id, root_name, "classification_root", 'root')
             add_template_fields( [child], relation_map )
 
             return HttpResponse(json.dumps([{
@@ -505,10 +505,10 @@ def classification_instance_operation(request, project_id=None):
         node_parent_id = params['parentid']
         if 0 == params['parentid']:
             # Find root element
-            classification_instance_operation.res_on_err = 'Failed to select root.'
+            classification_instance_operation.res_on_err = 'Failed to select classification root.'
             node_parent_id = ClassInstance.objects.filter(
                     project=project_id,
-                    class_column=class_map['root'])[0].id
+                    class_column=class_map['classification_root'])[0].id
 
         if params['relationname'] not in relation_map:
             CatmaidException('Failed to select relation %s' % params['relationname'])
