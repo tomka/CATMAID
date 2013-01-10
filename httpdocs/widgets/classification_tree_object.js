@@ -15,6 +15,88 @@ var ClassificationObjectTree = new function()
     $('#annotation_tree_object').jstree("rename");
   };
 
+  this.overrideNewTreeSubmit = function(container, pid) {
+    var form = $("#add-new-classification-form");
+    var found = form.length !== 0;
+    if (found) {
+        form.submit(function(){
+            $.ajax({
+                type: "POST",
+                url: form.attr('action'),
+                data: form.serialize(),
+                success: function(data, textStatus) {
+                    container.innerHTML = "<p>" + data + "</p><p>Reloading in a few seconds.</p>";
+                    setTimeout("ClassificationObjectTree.init(" + pid + ")", 1500);
+                }
+            });
+            return false;
+        });
+    }
+
+    return found;
+  }
+
+  this.overrideSelectTreeSubmit = function(container, pid) {
+    var form = $("#select-classification-form");
+    var found = form.length !== 0;
+    if (found) {
+        form.submit(function(){
+            $.ajax({
+                type: "POST",
+                url: form.attr('action'),
+                data: form.serialize(),
+                success: function(data, textStatus) {
+                    container.innerHTML = "<p>" + data + "</p><p>Reloading in a few seconds.</p>";
+                }
+            });
+            return false;
+        });
+    }
+
+    return found;
+  }
+
+  this.overrideRemoveTreeLink = function(container, pid) {
+    var remove_link = $("#remove_classification_link");
+    var found = remove_link.length !== 0;
+    if (found) {
+         remove_link.click(function(){
+             if (confirm("Are you sure you want to remove the whole classification tree?")) {
+                 $.ajax({
+                     type: "POST",
+                     url: remove_link.attr('href'),
+                     success: function(data, textStatus) {
+                         container.innerHTML = "<p>" + data + "</p><p>Reloading in a few seconds.</p>";
+                         setTimeout("ClassificationObjectTree.init(" + pid + ")", 1500);
+                     }
+                 });
+             }
+             return false;
+         });
+    }
+
+    return found;
+  }
+
+  this.overrideAddTreeLink = function(container, pid) {
+    var remove_link = $("#add_classification_link");
+    var found = remove_link.length !== 0;
+    if (found) {
+         remove_link.click(function(){
+             $.ajax({
+                 type: "POST",
+                 url: remove_link.attr('href'),
+                 success: function(data, textStatus) {
+                     container.innerHTML = data;
+                 }
+             });
+             return false;
+         });
+    }
+
+    return found;
+  }
+
   /**
    * Initialization of the window.
    */
@@ -29,41 +111,16 @@ var ClassificationObjectTree = new function()
                 var container = document.getElementById("classification_content");
                 container.innerHTML = data;
                 // Override the submit behaviour if the submit form is displayed
-                var form = $("#add-new-classification-form");
-                if (form.length !== 0) {
-                    form.submit(function(){
-                        $.ajax({
-                            type: "POST",
-                            url: form.attr('action'),
-                            data: form.serialize(),
-                            success: function(data, textStatus) {
-                                container.innerHTML = "<p>" + data + "</p><p>Reloading in a few seconds.</p>";
-                                setTimeout("ClassificationObjectTree.init(" + pid + ")", 1500);
-                            }
-                        });
-                        return false;
-                    });
-               } else {
-                   // Override the remove link behaviour
-                   var remove_link = $("#remove_classification_link");
-                   if (remove_link.length !== 0) {
-                        remove_link.click(function(){
-                            if (confirm("Are you sure you want to remove the whole classification tree?")) {
-                                $.ajax({
-                                    type: "POST",
-                                    url: remove_link.attr('href'),
-                                    success: function(data, textStatus) {
-                                        container.innerHTML = "<p>" + data + "</p><p>Reloading in a few seconds.</p>";
-                                        setTimeout("ClassificationObjectTree.init(" + pid + ")", 1500);
-                                    }
-                                });
-                            }
-                            return false;
-                        });
-                   }
-                   // display the tree
-                   ClassificationObjectTree.load_tree(pid);
-               }
+                var newTreeDialog = ClassificationObjectTree.overrideNewTreeSubmit(container, pid);
+                // Override the remove link behaviour
+                var removeTreeLink = ClassificationObjectTree.overrideRemoveTreeLink(container, pid);
+                // Override the add link behaviour
+                var addTreeLink = ClassificationObjectTree.overrideAddTreeLink(container, pid);
+
+                if (!newTreeDialog) {
+                    // display the tree
+                    ClassificationObjectTree.load_tree(pid);
+                }
             }
         });
   };
