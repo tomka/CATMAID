@@ -795,6 +795,7 @@ class ProjectAnnotationTreeTemplate(models.Model):
         managed = False
     project = models.ForeignKey(Project)
     annotation_tree_template = models.ForeignKey(AnnotationTreeTemplate)
+    root_class_instance = models.ForeignKey(ClassInstance)
 
 class ClassInstanceAnnotationTreeTemplateNode(models.Model):
     class Meta:

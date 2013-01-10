@@ -12,19 +12,18 @@ from catmaid.control.authentication import *
 from catmaid.control.common import *
 from catmaid.transaction import *
 
+# A dummy project is referenced by all the classes and class instances.
+# This is due to the fact, that one classification tree instance should
+# be referencey by multiple projects.
+dummy_pid = -1
+
 def get_classification_tree_number( project_id ):
     """ Returns the number of annotation trees, linked to a project.
     """
-    class_map = get_class_to_id_map(project_id)
-    if 'classification_root' not in class_map:
-        num_trees = 0
-    else:
-        parent_id = 0
-        root_node_q = ClassInstance.objects.filter(
-            project=project_id,
-            class_column=class_map['classification_root'])
-        num_trees = root_node_q.count()
-    return num_trees
+    root_nodes_q = ProjectAnnotationTreeTemplate.objects.filter(
+        project = project_id)
+
+    return root_nodes_q.count()
 
 @requires_user_role([UserRole.Annotate, UserRole.Browse])
 @report_error
@@ -99,8 +98,8 @@ def init_classification( user, project, template_tree ):
     a particular template tree.
     ToDo: Maybe all this should be done in one transaction.
     """
-    relation_map = get_relation_to_id_map(project.id)
-    class_map = get_class_to_id_map(project.id)
+    relation_map = get_relation_to_id_map(dummy_pid)
+    class_map = get_class_to_id_map(dummy_pid)
 
     # Create needed classes for project: root + all of template
 
@@ -127,7 +126,7 @@ def init_classification( user, project, template_tree ):
                     user = user,
                     class_name = cn,
                     description = "")
-                new_class.project_id = project.id
+                new_class.project_id = dummy_pid
                 new_class.save()
         # Add relation if it doesn't exist yet
         if node.relation_name not in relation_map:
@@ -137,7 +136,7 @@ def init_classification( user, project, template_tree ):
                 uri = "",
                 description = "",
                 isreciprocal = False)
-            new_relation.project_id = project.id
+            new_relation.project_id = dummy_pid
             new_relation.save()
 
     traverse_template_tree( template_tree.rootnode, add_class_names_and_relation )
@@ -145,8 +144,8 @@ def init_classification( user, project, template_tree ):
     # Create needed class_instances for project: root
     node = ClassInstance(
             user = user,
-            name = "Root")
-    node.project_id = project.id
+            name = "Classification root")
+    node.project_id = dummy_pid
     node.class_column_id = root_class_id
     node.save()
     # Link the node to a template tree node
@@ -158,6 +157,7 @@ def init_classification( user, project, template_tree ):
     p_t_link = ProjectAnnotationTreeTemplate()
     p_t_link.project_id = project.id
     p_t_link.annotation_tree_template_id = template_tree.id
+    p_t_link.root_class_instance_id = node.id
     p_t_link.save()
     # Remember this initalization in the log
     insert_into_log(project.id, user.id, "create_root", None, "Created root with ID %s" % node.id)
@@ -297,12 +297,6 @@ def classification_list(request, project_id=None):
 
     max_nodes = 5000  # Limit number of nodes retrievable.
 
-    relation_map = get_relation_to_id_map(project_id)
-    class_map = get_class_to_id_map(project_id)
-
-    if 'classification_root' not in class_map:
-        raise CatmaidException('Can not find "classification_root" class for this project')
-
     #for relation in ['model_of', 'part_of']:
     #    if relation not in relation_map:
     #        raise CatmaidException('Can not find "%s" relation for this project' % relation)
@@ -314,27 +308,22 @@ def classification_list(request, project_id=None):
     elif len(template_tree_set) > 1:
         raise CatmaidException('Found more than one linked template trees')
     else:
+        root_class_instance = template_tree_set[0].root_class_instance
         template_tree = template_tree_set[0].annotation_tree_template
 
     # Find all the relations that are defined in it
     # ToDo: Maybe caching should be added
     relations = []
+    relation_map = get_relation_to_id_map(dummy_pid)
 
     response_on_error = ''
     try:
         if 0 == parent_id:
             response_on_error = 'Could not select the id of the classification root node.'
-            root_node_q = ClassInstance.objects.filter(
-                project=project_id,
-                class_column=class_map['classification_root'])
 
-            if 0 == root_node_q.count():
-                root_id = 0
-                root_name = 'noname'
-            else:
-                root_node = root_node_q[0]
-                root_id = root_node.id
-                root_name = root_node.name
+            root_node = root_class_instance
+            root_id = root_node.id
+            root_name = root_node.name
 
             # Collect all child node class instances
             child = Child( root_id, root_name, "classification_root", 'root')
@@ -380,8 +369,8 @@ def classification_instance_operation(request, project_id=None):
         # TODO sanitize
         params[k] = request.POST.get(k, 0)
  
-    relation_map = get_relation_to_id_map(project_id)
-    class_map = get_class_to_id_map(project_id)
+    relation_map = get_relation_to_id_map(dummy_pid)
+    class_map = get_class_to_id_map(dummy_pid)
 
     # We avoid many try/except clauses by setting this string to be the
     # response we return if an exception is thrown.
@@ -496,7 +485,7 @@ def classification_instance_operation(request, project_id=None):
         node = ClassInstance(
                 user=request.user,
                 name=params['objname'])
-        node.project_id = project_id
+        node.project_id = dummy_pid
         node.class_column_id = class_map[params['classname']]
         node.save()
         insert_into_log(project_id, request.user.id, "create_%s" % params['classname'], None, "Created %s with ID %s" % (params['classname'], params['id']))
@@ -507,7 +496,7 @@ def classification_instance_operation(request, project_id=None):
             # Find root element
             classification_instance_operation.res_on_err = 'Failed to select classification root.'
             node_parent_id = ClassInstance.objects.filter(
-                    project=project_id,
+                    project=dummy_pid,
                     class_column=class_map['classification_root'])[0].id
 
         if params['relationname'] not in relation_map:
@@ -516,7 +505,7 @@ def classification_instance_operation(request, project_id=None):
         classification_instance_operation.res_on_err = 'Failed to insert relation.'
         cici = ClassInstanceClassInstance()
         cici.user = request.user
-        cici.project_id = project_id
+        cici.project_id = dummy_pid
         cici.relation_id = relation_map[params['relationname']]
         cici.class_instance_a_id = node.id
         cici.class_instance_b_id = node_parent_id
@@ -539,7 +528,7 @@ def classification_instance_operation(request, project_id=None):
             relation_ids.append(relation_map[relation])
         classification_instance_operation.res_on_err = 'Failed to select CICI.'
         relation_count = ClassInstanceClassInstance.objects.filter(
-                project=project_id,
+                project=dummy_pid,
                 class_instance_b=params['id'],
                 relation__in=relation_ids).count()
         if relation_count > 0:
