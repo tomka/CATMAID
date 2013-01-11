@@ -15,4 +15,10 @@ that you would like the new tree to be based on and click on
 this project. If you want to do so, please select the tree below
 and click "Link".</p>
 
-[ToDo]
+<form method="post" id="link-classification-form"
+      action="{% url 'catmaid.control.link_classification' project_id %}">
+    <p>
+    {{ link_tree_form }}
+    <input type="submit" value="Link" />
+    </p>
+</form>

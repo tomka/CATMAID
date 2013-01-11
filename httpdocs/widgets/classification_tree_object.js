@@ -56,6 +56,27 @@ var ClassificationObjectTree = new function()
     return found;
   }
 
+  this.overrideAddLinkSubmit = function(container, pid) {
+    var form = $("#link-classification-form");
+    var found = form.length !== 0;
+    if (found) {
+        form.submit(function(){
+            $.ajax({
+                type: "POST",
+                url: form.attr('action'),
+                data: form.serialize(),
+                success: function(data, textStatus) {
+                    container.innerHTML = "<p>" + data + "</p><p>Reloading in a few seconds.</p>";
+                    setTimeout("ClassificationObjectTree.init(" + pid + ")", 1500);
+                }
+            });
+            return false;
+        });
+    }
+
+    return found;
+  }
+
   this.overrideRemoveTreeLink = function(container, pid) {
     var remove_link = $("#remove_classification_link");
     var found = remove_link.length !== 0;
@@ -112,6 +133,8 @@ var ClassificationObjectTree = new function()
                 container.innerHTML = data;
                 // Override the submit behaviour if the submit form is displayed
                 var newTreeDialog = ClassificationObjectTree.overrideNewTreeSubmit(container, pid);
+                // Override the submit behaviour if the add link form is displayed
+                var newLinkDialog = ClassificationObjectTree.overrideAddLinkSubmit(container, pid);
                 // Override the remove link behaviour
                 var removeTreeLink = ClassificationObjectTree.overrideRemoveTreeLink(container, pid);
                 // Override the add link behaviour

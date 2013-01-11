@@ -52,6 +52,8 @@ def classification_display(request, project_id=None):
 
     if num_trees == 0:
         context['new_tree_form'] = NewClassificationForm()
+        link_form = create_link_form(project_id)
+        context['link_tree_form'] = link_form()
         template = Template("""
         <p>There is currently no annotation tree associated with this
         project. Please create a new one if you like.</p>
@@ -214,6 +216,15 @@ class NewClassificationForm(forms.Form):
     template_tree = forms.ModelChoiceField(
         queryset=AnnotationTreeTemplate.objects.all())
 
+def create_link_form(project_id):
+    """ Creates a simple form  class to select available classifications
+    excluding the ones already linked to the project
+    """
+    class AvailableClassificationsForm(forms.Form):
+        classification_link = forms.ModelChoiceField(
+                queryset=ProjectAnnotationTreeTemplate.objects.exclude(project=project_id))
+    return AvailableClassificationsForm
+
 def create_classification_form(project_id):
     """ Creates a simple form  class to select available classifications.
     """
@@ -234,12 +245,49 @@ def add_new_classification(request, project_id=None):
             init_classification( request.user, project, template_tree )
             return HttpResponse('A new tree has been initalized.')
     else:
-        form = NewClassificationForm()
+        new_tree_form = NewClassificationForm()
+        link_form = create_link_form( project_id )
+        link_tree_form = link_form()
 
-    return render_to_response("catmaid/new_classification_tree.html", {
-        "project_id": project_id,
-        "new_tree_form": form,
-    })
+        return render_to_response("catmaid/new_classification_tree.html", {
+            "project_id": project_id,
+            "new_tree_form": new_tree_form,
+            "link_tree_form": link_tree_form,
+        })
+
+@requires_user_role([UserRole.Annotate, UserRole.Browse])
+def link_classification(request, project_id=None):
+    link_form = create_link_form( project_id )
+    # Has the form been submitted?
+    if request.method == 'POST':
+        form = link_form(request.POST)
+        if form.is_valid():
+            # Create the new classification tree
+            project = get_object_or_404(Project, pk=project_id)
+            classification_link = form.cleaned_data['classification_link']
+            create_link( project, classification_link.root_class_instance,
+                classification_link.annotation_tree_template)
+            return HttpResponse('The project has been linked to the selected tree.')
+    else:
+        new_tree_form = NewClassificationForm()
+        link_tree_form = link_form()
+
+        return render_to_response("catmaid/new_classification_tree.html", {
+            "project_id": project_id,
+            "new_tree_form": new_tree_form,
+            "link_tree_form": link_tree_form,
+        })
+
+def create_link( project, root_class_instance, template ):
+    # Make sure there isn't already such a link
+    num_same_links = ProjectAnnotationTreeTemplate.objects.filter(
+        project=project, root_class_instance=root_class_instance).count()
+    if num_same_links != 0:
+        CatmaidException('A project can only be linked once to a certain root node.')
+
+    ProjectAnnotationTreeTemplate.objects.create(
+        project=project, annotation_tree_template=template,
+        root_class_instance=root_class_instance)
 
 class Child:
     """ Keeps the class instance ID, title, node type and
