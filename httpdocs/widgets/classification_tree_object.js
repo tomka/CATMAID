@@ -67,7 +67,7 @@ var ClassificationObjectTree = new function()
                      url: remove_link.attr('href'),
                      success: function(data, textStatus) {
                          container.innerHTML = "<p>" + data + "</p><p>Reloading in a few seconds.</p>";
-                         setTimeout("ClassificationObjectTree.init(" + pid + ")", 1500);
+                         setTimeout("ClassificationObjectTree.init(" + pid + ")", 3000);
                      }
                  });
              }

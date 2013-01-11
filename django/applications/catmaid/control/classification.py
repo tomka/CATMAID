@@ -57,6 +57,9 @@ def classification_display(request, project_id=None):
         project. Please create a new one if you like.</p>
         {% include "catmaid/new_classification_tree.html" %}""")
     elif num_trees == 1:
+        selected_tree = ProjectAnnotationTreeTemplate.objects.filter(
+            project=project_id)[0]
+        context['tree_id'] = selected_tree.id
         template = loader.get_template( "catmaid/classification_tree.html" )
     else:
         form = create_classification_form( project_id )
@@ -68,23 +71,65 @@ def classification_display(request, project_id=None):
 
     return HttpResponse( template.render( context ) )
 
+def traverse_class_instances(node, func):
+    """ Traverses a class instance tree, starting from the passed node.
+    It recurses into child trees and calls the passed function on each
+    node."""
+    children = ClassInstance.objects.filter(cici_via_a__class_instance_b=node)
+    for c in children:
+        traverse_class_instances(c, func)
+    func(node)
+
+def delete_node(node):
+    """ Simply deletes a nodo.
+    """
+    node.delete()
+
 @requires_user_role([UserRole.Annotate, UserRole.Browse])
-def remove_classification( request, project_id=None ):
+def remove_classification( request, project_id=None, link_id=None ):
     """ Removes the annotation tree of the project. All the class instances
     linked to the project and template tree links will get removed.
     """
-    class_instances = ClassInstance.objects.filter(project=project_id)
+    # Collect informaiton about classification trees
+    links = ProjectAnnotationTreeTemplate.objects.filter(id=link_id,
+        project=project_id)
 
-    for ci in class_instances:
-        # Delete link to template node
-        ClassInstanceAnnotationTreeTemplateNode.objects.filter(class_instance=ci.id)[0].delete()
-        # Delete class instance
-        ci.delete()
+    # Sanity checks
+    if links.count() == 0:
+        return HttpResponse('The submitted link id couldn\'t be found. Aborting.')
+    if links.count() > 1:
+        return HttpResponse('The submitted link is available more than once. Aborting.')
 
-    template_tree_link = ProjectAnnotationTreeTemplate.objects.filter(project=project_id)
-    template_tree_link.delete()
+    num_removed_links = 0
+    num_removed_ci = 0
+    num_total_refs = 0
 
-    return HttpResponse('The classification tree has been removed.')
+    link = links[0]
+    # Delete this link
+    link.delete()
+    num_removed_links = num_removed_links + 1
+    # Find number of other projects that are linked to the
+    # classification trees that should get deleted
+    num_extra_links = ProjectAnnotationTreeTemplate.objects.filter(
+        root_class_instance=link.root_class_instance).count()
+    num_total_refs = num_total_refs + num_extra_links
+    # If there are no other links to a template, the class
+    # instances get removed
+    if num_extra_links == 0:
+        # Data that links to this CI through a foreign key will get
+        # removed, too.
+        traverse_class_instances(link.root_class_instance, delete_node)
+        # class_instance_annotation_tree_template_node
+        num_removed_ci = num_removed_ci + 1
+
+    if num_removed_links == 0:
+        msg = 'The requested link couldn\'t get removed.'
+    elif num_removed_ci == 0:
+        msg = 'All links from this project to the classifiation tree have been removed. There are still ' + str(num_total_refs) + ' link(s) to this classification tree present.'
+    else:
+        msg = str(num_removed_ci) + ' classification tree(s) for this project have been removed.'
+
+    return HttpResponse(msg)
 
 def traverse_template_tree( node, method, level = 1 ):
     """ Traverses the given template tree and calls the

@@ -1,6 +1,6 @@
 <input type="button" id="refresh_annotation_tree" value="refresh" style="display:block; float:left;" />
 &nbsp; Synchronize <input type="checkbox" id="synchronize_annotation_tree" checked="yes" />
-&nbsp; <a id="remove_classification_link" href="{{ CATMAID_DJANGO_URL}}{{ project_id }}/class-tree/remove">Remove this tree</a>
+&nbsp; <a id="remove_classification_link" href="{{ CATMAID_DJANGO_URL}}{{ project_id }}/class-tree/{{ tree_id }}/remove">Remove this tree</a>
 &nbsp; <a id="add_classification_link" href="{{ CATMAID_DJANGO_URL}}{{ project_id }}/class-tree/new">Add new tree</a>
 <br clear="all" />
 <div id="annotation_tree_object"></div>
