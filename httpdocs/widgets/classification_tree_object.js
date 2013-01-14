@@ -46,7 +46,10 @@ var ClassificationObjectTree = new function()
                 url: form.attr('action'),
                 data: form.serialize(),
                 success: function(data, textStatus) {
-                    container.innerHTML = "<p>" + data + "</p><p>Reloading in a few seconds.</p>";
+                    container.innerHTML = data;
+                    var link_id = $("#link_id", container).attr('value');
+                    ClassificationObjectTree.addOverrides(container, pid);
+                    ClassificationObjectTree.load_tree(pid, link_id)
                 }
             });
             return false;
@@ -118,6 +121,21 @@ var ClassificationObjectTree = new function()
     return found;
   }
 
+  this.addOverrides = function(container, pid) {
+    // Override the submit behaviour if the submit form is displayed
+    var newTreeDialog = ClassificationObjectTree.overrideNewTreeSubmit(container, pid);
+    // Override the submit behaviour if the add link form is displayed
+    var newLinkDialog = ClassificationObjectTree.overrideAddLinkSubmit(container, pid);
+    // Override the submit behaviour if the select tree form is displayed
+    var selectTreeDialog = ClassificationObjectTree.overrideSelectTreeSubmit(container, pid);
+    // Override the remove link behaviour
+    var removeTreeLink = ClassificationObjectTree.overrideRemoveTreeLink(container, pid);
+    // Override the add link behaviour
+    var addTreeLink = ClassificationObjectTree.overrideAddTreeLink(container, pid);
+
+    return !newTreeDialog && !newLinkDialog && !selectTreeDialog;
+  }
+
   /**
    * Initialization of the window.
    */
@@ -131,16 +149,10 @@ var ClassificationObjectTree = new function()
             } else {
                 var container = document.getElementById("classification_content");
                 container.innerHTML = data;
-                // Override the submit behaviour if the submit form is displayed
-                var newTreeDialog = ClassificationObjectTree.overrideNewTreeSubmit(container, pid);
-                // Override the submit behaviour if the add link form is displayed
-                var newLinkDialog = ClassificationObjectTree.overrideAddLinkSubmit(container, pid);
-                // Override the remove link behaviour
-                var removeTreeLink = ClassificationObjectTree.overrideRemoveTreeLink(container, pid);
-                // Override the add link behaviour
-                var addTreeLink = ClassificationObjectTree.overrideAddTreeLink(container, pid);
 
-                if (!newTreeDialog) {
+                var singleTreeDisplay = ClassificationObjectTree.addOverrides(container, pid);
+
+                if (singleTreeDisplay) {
                     // display the tree
                     ClassificationObjectTree.load_tree(pid);
                 }
@@ -148,7 +160,7 @@ var ClassificationObjectTree = new function()
         });
   };
 
-  this.load_tree = function(pid) {
+  this.load_tree = function(pid, link_id) {
     // id of object tree
     var annotation_tree_id = "#annotation_tree_object";
     var tree = $(annotation_tree_id);
@@ -164,6 +176,11 @@ var ClassificationObjectTree = new function()
          }
        });
 
+    var url = django_url + pid + '/class-tree/list';
+    if (link_id != null) {
+        url += "/" + link_id;
+    }
+
     tree.jstree({
       "core": {
         "html_titles": false,
@@ -172,7 +189,7 @@ var ClassificationObjectTree = new function()
       "plugins": ["themes", "json_data", "ui", "crrm", "types", "dnd", "contextmenu"],
       "json_data": {
         "ajax": {
-          "url": django_url + pid + '/class-tree/list',
+          "url": url,
           "data": function (n) {
             var expandRequest, parentName, parameters;
             // depending on which type of node it is, display those

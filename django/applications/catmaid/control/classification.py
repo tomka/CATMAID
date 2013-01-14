@@ -33,43 +33,65 @@ def classification_tree_number(request, project_id=None):
         {'number_trees': num_trees}))
 
 @requires_user_role([UserRole.Annotate, UserRole.Browse])
-def classification_display(request, project_id=None):
+def classification_display(request, project_id=None, link_id=None):
+    return create_classification_display( project_id, link_id )
+
+def create_classification_display(project_id=None, link_id=None):
     """ Creates a view that allows the user to create a new
     classification tree.
     """
 
-    # First, check how many trees there are.
-    num_trees = get_classification_tree_number( project_id )
+    # Check if one specific tree is wanted
+    if link_id is not None:
+        num_trees = 1
 
-    template_trees = AnnotationTreeTemplate.objects.all()
-
-    context = Context({
-        'num_trees': num_trees,
-        'template_trees': template_trees,
-        'project_id': project_id,
-        'CATMAID_DJANGO_URL': settings.CATMAID_DJANGO_URL
-    })
-
-    if num_trees == 0:
-        context['new_tree_form'] = NewClassificationForm()
-        link_form = create_link_form(project_id)
-        context['link_tree_form'] = link_form()
-        template = Template("""
-        <p>There is currently no annotation tree associated with this
-        project. Please create a new one if you like.</p>
-        {% include "catmaid/new_classification_tree.html" %}""")
-    elif num_trees == 1:
         selected_tree = ProjectAnnotationTreeTemplate.objects.filter(
-            project=project_id)[0]
-        context['tree_id'] = selected_tree.id
+            id=link_id, project=project_id)
+        if selected_tree.count() != 1:
+            raise CatmaidException('Couldn\'t select requested tree.')
+        else:
+            selected_tree = selected_tree[0]
+
+        context = Context({
+            'num_trees': 1,
+            'tree_id': link_id,
+            'project_id': project_id,
+            'CATMAID_DJANGO_URL': settings.CATMAID_DJANGO_URL
+        })
+
         template = loader.get_template( "catmaid/classification_tree.html" )
     else:
-        form = create_classification_form( project_id )
-        context['select_tree_form'] = form()
-        template = Template("""
-        <p>There are {{num_trees}} annotation trees associated
-        with this project. Please select which one you want to display.</p>
-        {% include "catmaid/select_classification_tree.html" %}""")
+        # First, check how many trees there are.
+        num_trees = get_classification_tree_number( project_id )
+        template_trees = AnnotationTreeTemplate.objects.all()
+
+        context = Context({
+            'num_trees': num_trees,
+            'template_trees': template_trees,
+            'project_id': project_id,
+            'CATMAID_DJANGO_URL': settings.CATMAID_DJANGO_URL
+        })
+
+        if num_trees == 0:
+            context['new_tree_form'] = NewClassificationForm()
+            link_form = create_link_form(project_id)
+            context['link_tree_form'] = link_form()
+            template = Template("""
+            <p>There is currently no annotation tree associated with this
+            project. Please create a new one if you like.</p>
+            {% include "catmaid/new_classification_tree.html" %}""")
+        elif num_trees == 1:
+            selected_tree = ProjectAnnotationTreeTemplate.objects.filter(
+                project=project_id)[0]
+            context['tree_id'] = selected_tree.id
+            template = loader.get_template( "catmaid/classification_tree.html" )
+        else:
+            form = create_classification_form( project_id )
+            context['select_tree_form'] = form()
+            template = Template("""
+            <p>There are {{num_trees}} annotation trees associated
+            with this project. Please select which one you want to display.</p>
+            {% include "catmaid/select_classification_tree.html" %}""")
 
     return HttpResponse( template.render( context ) )
 
@@ -233,6 +255,20 @@ def create_classification_form(project_id):
                 queryset=ProjectAnnotationTreeTemplate.objects.filter(project=project_id))
     return AvailableClassificationsForm
 
+def select_classification(request, project_id=None):
+    if request.method == 'POST':
+        form_class = create_classification_form( project_id )
+        form = form_class(request.POST)
+        if form.is_valid():
+            link = form.cleaned_data['classification_tree']
+            return create_classification_display( int(project_id), link.id )
+    else:
+        form_class = create_classification_form( project_id )
+        return render_to_response("catmaid/select_classification_tree.html", {
+            "project_id": project_id,
+            "select_tree_form": form_class(),
+        })
+
 @requires_user_role([UserRole.Annotate, UserRole.Browse])
 def add_new_classification(request, project_id=None):
     # Has the form been submitted?
@@ -387,7 +423,7 @@ def add_template_fields( child_list, relation_map ):
 
 @requires_user_role([UserRole.Annotate, UserRole.Browse])
 @report_error
-def classification_list(request, project_id=None):
+def classification_list(request, project_id=None, link_id=None):
     parent_id = int(request.GET.get('parentid', 0))
     parent_name = request.GET.get('parentname', '')
     expand_request = request.GET.get('expandtarget', None)
@@ -404,7 +440,11 @@ def classification_list(request, project_id=None):
     #        raise CatmaidException('Can not find "%s" relation for this project' % relation)
 
     # Get the template tree
-    template_tree_set = ProjectAnnotationTreeTemplate.objects.filter(project=project_id)
+    if link_id is None:
+        template_tree_set = ProjectAnnotationTreeTemplate.objects.filter(project=project_id)
+    else:
+        template_tree_set = ProjectAnnotationTreeTemplate.objects.filter(id=link_id)
+
     if template_tree_set == None:
         raise CatmaidException('Can not find a linked template tree')
     elif len(template_tree_set) > 1:
@@ -540,7 +580,7 @@ def classification_instance_operation(request, project_id=None):
         can_edit_or_fail(request.user, params['id'], 'class_instance')
         # Check if node is a skeleton. If so, we have to remove its treenodes as well!
         if 0 == params['rel']:
-            CatmaidException('No relation given!')
+            raise CatmaidException('No relation given!')
         elif 'element' == params['rel']:
 
             def delete_node( node ):
@@ -602,7 +642,7 @@ def classification_instance_operation(request, project_id=None):
                     class_column=class_map['classification_root'])[0].id
 
         if params['relationname'] not in relation_map:
-            CatmaidException('Failed to select relation %s' % params['relationname'])
+            raise CatmaidException('Failed to select relation %s' % params['relationname'])
 
         classification_instance_operation.res_on_err = 'Failed to insert relation.'
         cici = ClassInstanceClassInstance()
