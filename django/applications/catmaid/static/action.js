@@ -364,6 +364,16 @@ var segmentationWindowActions = [
     }
   }),
 
+  new Action({
+    helpText: "Clustering tool",
+    buttonID: "clustering_button",
+    buttonName: 'clustering',
+    run: function (e) {
+      WindowMaker.show('clustering-widget');
+      return true;
+    }
+  }),
+
 ];
 
 var tracingWindowActions = [
