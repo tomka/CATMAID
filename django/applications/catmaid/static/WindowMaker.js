@@ -1296,6 +1296,8 @@ var WindowMaker = new function()
 
     addLogic(win);
 
+    ClusteringWidget.init();
+
     return win;
   };
 
