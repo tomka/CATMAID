@@ -289,6 +289,16 @@ var editToolActions = [
 var classificationToolActions = [
 
   new Action({
+    helpText: "Show ontology editor",
+    buttonID: "ontology_editor_button",
+    buttonName: 'ontology_editor',
+    run: function (e) {
+      WindowMaker.show('ontology-editor');
+      return true;
+    }
+  }),
+
+  new Action({
     helpText: "Show classification tree editor",
     buttonID: "classification_editor_button",
     buttonName: 'classification_editor',
@@ -296,7 +306,7 @@ var classificationToolActions = [
       WindowMaker.show('classification-editor');
       return true;
     }
-  }),
+  })
 
 ];
 

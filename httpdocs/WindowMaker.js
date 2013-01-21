@@ -840,6 +840,26 @@ var WindowMaker = new function()
     return win;
   };
 
+  var createOntologyWidget = function()
+  {
+    var win = new CMWWindow( "Ontology editor" );
+    var content = win.getFrame();
+    content.style.backgroundColor = "#ffffff";
+
+    var container = createContainer( "ontology_editor_widget" );
+    content.appendChild( container );
+
+    container.innerHTML = '<div id="ontology_content"></div>';
+
+    addListener(win, container);
+
+    addLogic(win);
+
+    OntologyTree.init( project.getId() );
+
+    return win;
+  };
+
   var getHelpForActions = function(actions)
   {
     var action, keys, i, k, result = '';
@@ -1070,7 +1090,8 @@ var WindowMaker = new function()
     "review-system": createReviewWindow,
     "connectivity-widget": createConnectivityWindow,
     "adjacencymatrix-widget": createAdjacencyMatrixWindow,
-    "classification-editor": createClassificationWidget
+    "classification-editor": createClassificationWidget,
+    "ontology-editor": createOntologyWidget
   };
 
   /** If the window for the given name is already showing, just focus it.
