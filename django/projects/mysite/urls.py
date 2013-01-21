@@ -7,6 +7,7 @@ admin.autodiscover()
 
 # A regular expression matching floating point and integer numbers
 num = r'[-+]?[0-9]*\.?[0-9]+'
+integer = r'[-+]?[0-9]+'
 # A regular expression matching lists of integers with comma as delimiter
 intlist = r'[0-9]+(,[0-9]+)*'
 
@@ -173,6 +174,11 @@ urlpatterns += patterns('',
     (r'^dataviews/show/(?P<data_view_id>\d+)$', 'catmaid.control.get_data_view'),
     (r'^dataviews/show/default$', 'catmaid.control.get_default_data_view'),
     (r'^dataviews/type/comment$', 'catmaid.control.get_data_view_type_comment'),
+    )
+
+# Ontologies
+urlpatterns += patterns('',
+    (r'^(?P<project_id>%s)/ontology/list$' % (integer), 'catmaid.control.list_ontology'),
     )
 
 # Classification trees

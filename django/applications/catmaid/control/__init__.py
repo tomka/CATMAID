@@ -30,3 +30,4 @@ from wiringdiagram import *
 from segmentation import *
 from data_view import *
 from classification import *
+from ontology import *
