@@ -256,6 +256,12 @@ class Class(models.Model):
     class_name = models.CharField(max_length=255)
     description = models.TextField()
 
+    def relates_to( self, other, relation ):
+        """ Returns true if this class is transitively related
+        to the other class with the given relation. """
+
+        return False
+
 class ConnectivityDirection:
     PRESYNAPTIC_PARTNERS = 0
     POSTSYNAPTIC_PARTNERS = 1

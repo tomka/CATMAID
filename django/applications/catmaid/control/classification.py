@@ -17,6 +17,20 @@ from catmaid.transaction import *
 # be referencey by multiple projects.
 dummy_pid = -1
 
+def get_subtree_class_to_id_map(root):
+    """ Returns a map of classes to their IDs. Only classes that are
+    somehow linked through a relation to root will be in this map.
+    """
+    tree_elements = get_children(root.id)
+    tree_child_ids = []
+    for c in tree_elements:
+        tree_child_ids.append(c.id)
+    result = {}
+    for r in Class.objects.filter(project=dummy_pid):
+        if r.id in tree_child_ids:
+            result[r.class_name] = r.id
+    return result
+
 def get_classification_tree_number( project_id ):
     """ Returns the number of annotation trees, linked to a project.
     """
@@ -104,11 +118,6 @@ def traverse_class_instances(node, func):
         traverse_class_instances(c, func)
     func(node)
 
-def delete_node(node):
-    """ Simply deletes a nodo.
-    """
-    node.delete()
-
 @requires_user_role([UserRole.Annotate, UserRole.Browse])
 def remove_classification( request, project_id=None, link_id=None ):
     """ Removes the annotation tree of the project. All the class instances
@@ -172,33 +181,114 @@ def traverse_template_tree( node, method, level = 1 ):
     for child in node.children.all():
         traverse_template_tree( child, method, level + 1 )
 
+def get_or_create_classification_root(user):
+    """ Create a classification root, if needed. Returns this
+    or the present one.
+    """
+    class_map = get_class_to_id_map(dummy_pid)
+    if 'classification_root' in class_map:
+        cls_root_class_id = class_map['classification_root']
+        cls_root_class = Class.objects.filter(id=cls_root_class_id)[0]
+    else:
+        cls_root_class = Class(
+                user = user,
+                class_name = "classification_root",
+                description ="Classification root node")
+        cls_root_class.project_id = dummy_pid
+        cls_root_class.save()
+
+    return cls_root_class
+
+def get_or_create_relation(user, relation):
+    relation_map = get_relation_to_id_map(dummy_pid)
+    if relation in relation_map:
+        rel_id = relation_map[relation]
+        rel = Relation.objects.filter(id=rel_id)[0]
+    else:
+        rel = Relation(
+            user = user,
+            relation_name = relation,
+            uri = "",
+            description = "",
+            isreciprocal = False)
+        rel.project_id = dummy_pid
+        rel.save()
+
+    return rel
+
+def get_or_create_root_class_instance( user, cls_root_class, rootnode, rel ):
+    """ Check if we need to create a new root for the current ontology.
+    Make sure that this root node is also the root of the template_tree
+    in question. This is the case if there is already a class instance
+    linked to the template tree's root node. Otherwise we would create
+    a new root.
+    """ 
+    links_qs = ClassInstanceAnnotationTreeTemplateNode.objects.filter(
+        annotation_tree_template_node=rootnode)
+    if links_qs.count() > 0:
+        root_class = link_qs[0].class_instance.class_column
+    else:
+        # Create root class for this ontology
+        root_class = Class(
+            user = user,
+            class_name = rootnode.name,
+            description ="Classification root node")
+        root_class.project_id = dummy_pid
+        root_class.save()
+        # Relate this class to the classification root
+        clcl = ClassClass(
+            user = user,
+            class_a = root_class,
+            class_b = cls_root_class,
+            relation = rel)
+        clcl.project_id = dummy_pid
+        clcl.save()
+
+    return root_class
+
+
 def init_classification( user, project, template_tree ):
     """ Initializes a classification for a project based on
     a particular template tree.
     ToDo: Maybe all this should be done in one transaction.
     """
-    relation_map = get_relation_to_id_map(dummy_pid)
-    class_map = get_class_to_id_map(dummy_pid)
-
     # Create needed classes for project: root + all of template
+    cls_root_class = get_or_create_classification_root( user )
 
-    if 'classification_root' not in class_map:
-        root_class = Class(
-                user = user,
-                class_name = "classification_root",
-                description ="Classification root node")
-        root_class.project_id = dummy_pid
-        root_class.save()
-        root_class_id = root_class.id
-    else:
-        root_class_id = class_map['classification_root']
+    # Create basic relations if not present
+    is_a_rel = get_or_create_relation( user, "is_a" )
+
+    # Get the root class instance of this template tree
+    root_ci = get_or_create_root_class_instance(
+        user, cls_root_class, template_tree.rootnode, is_a_rel )
+
+    class_map = get_subtree_class_to_id_map(root_ci)
+    relation_map = get_relation_to_id_map(dummy_pid)
 
     def add_class_names_and_relation( node ):
         """ Adds all the class names in this node to this project
         as well as the relation they should be linked to a parent.
         """
+        if node is template_tree.rootnode:
+            node_class = root_ci
+        else:
+            # Node class
+            if node.name in class_map:
+                node_class_id = class_map[node.name]
+                node_class = Class.objects.filter(id=node_class_id)[0]
+            else:
+                node_class = Class(user = user,
+                    class_name = node.name,
+                    description = "")
+                node_class.project_id = dummy_pid
+                node_class.save()
+            
         # Class names
         for cn in node.class_names:
+            # If a class with this name is already present,
+            # check if it is part of the same ontology
+            #if cn in class_map:
+
             # Add the class if it doesn't exist yet
             if cn not in class_map:
                 new_class = Class(
@@ -207,6 +297,14 @@ def init_classification( user, project, template_tree ):
                     description = "")
                 new_class.project_id = dummy_pid
                 new_class.save()
+                # Create class-class relationships to reflect subtypes
+                clcl = ClassClass(
+                    user = user,
+                    class_a = new_class,
+                    class_b = node_class,
+                    relation = is_a_rel)
+                clcl.project_id = dummy_pid
+                clcl.save()
         # Add relation if it doesn't exist yet
         if node.relation_name not in relation_map:
             new_relation = Relation(
@@ -217,15 +315,17 @@ def init_classification( user, project, template_tree ):
                 isreciprocal = False)
             new_relation.project_id = dummy_pid
             new_relation.save()
+        # TODO: Link to parent
 
+    # Make sure there is a class for every path in the tree
     traverse_template_tree( template_tree.rootnode, add_class_names_and_relation )
 
     # Create needed class_instances for project: root
     node = ClassInstance(
             user = user,
-            name = "Classification root")
+            name = template_tree.rootnode.name)
     node.project_id = dummy_pid
-    node.class_column_id = root_class_id
+    node.class_column_id = root_ci.id
     node.save()
     # Link the node to a template tree node
     ci_t_link = ClassInstanceAnnotationTreeTemplateNode()
@@ -348,7 +448,7 @@ class Child:
         self.template_node_name = ""
         self.template_node_alt = []
 
-def get_children( parent_id, relation_map, max_nodes = 5000 ):
+def get_children( parent_id, max_nodes = 5000 ):
     """ Returns all children of a node with id <parent_id>. The result
     is limited to a maximum ef <max_nodes> nodes.
     """
@@ -369,11 +469,9 @@ def get_children( parent_id, relation_map, max_nodes = 5000 ):
                 INNER JOIN "auth_user"
                 ON ci.user_id = "auth_user".id
             WHERE cici.class_instance_b = %s
-              AND (cici.relation_id = %s)
             ORDER BY ci.name ASC
             LIMIT %s''', (
         parent_id,
-        relation_map['part_of'],
         max_nodes))
 
     # Collect all child node class instances
@@ -410,7 +508,7 @@ def add_template_classes( child_list ):
 
     return child_list
 
-def add_template_fields( child_list, relation_map ):
+def add_template_fields( child_list ):
     """ Adds template information to the child list. Concept
     information as well as instance information is added.
     """
@@ -419,7 +517,7 @@ def add_template_fields( child_list, relation_map ):
     # Get children of every children. This is needed to tell the user,
     # what options (s)he still has to alter the tree.
     for node in child_list:
-        sub_children = get_children( node.id, relation_map )
+        sub_children = get_children( node.id )
         for sub_child in sub_children:
             # Get template tree nodes
             template_tree_node = ClassInstanceAnnotationTreeTemplateNode.objects.filter(
@@ -478,7 +576,7 @@ def classification_list(request, project_id=None, link_id=None):
 
             # Collect all child node class instances
             child = Child( root_id, root_name, "classification_root", 'root')
-            add_template_fields( [child], relation_map )
+            add_template_fields( [child] )
 
             return HttpResponse(json.dumps([{
                 'data': {'title': child.title},
@@ -490,8 +588,8 @@ def classification_list(request, project_id=None, link_id=None):
 
         response_on_error = 'Could not retrieve child nodes.'
 
-        child_nodes = get_children( parent_id, relation_map )
-        add_template_fields( child_nodes, relation_map )
+        child_nodes = get_children( parent_id )
+        add_template_fields( child_nodes )
 
         # TODO: When encountering a leaf node, "state" has to be omitted
 
