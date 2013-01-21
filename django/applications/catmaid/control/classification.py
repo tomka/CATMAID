@@ -140,11 +140,20 @@ def remove_classification( request, project_id=None, link_id=None ):
     # If there are no other links to a template, the class
     # instances get removed
     if num_extra_links == 0:
+        classes = set()
+        def delete_node(node):
+            """ Simply deletes a nodo.
+            """
+            node.delete()
+            classes.add(node.class_column)
         # Data that links to this CI through a foreign key will get
         # removed, too.
         traverse_class_instances(link.root_class_instance, delete_node)
         # class_instance_annotation_tree_template_node
         num_removed_ci = num_removed_ci + 1
+        # Remove all classes
+        for c in classes:
+            c.delete()
 
     if num_removed_links == 0:
         msg = 'The requested link couldn\'t get removed.'
@@ -594,6 +603,8 @@ def classification_instance_operation(request, project_id=None):
                 ClassInstanceAnnotationTreeTemplateNode.objects.filter(class_instance=node.id)[0].delete()
                 # Delete class instance
                 node.delete()
+
+                # TODO: Delete classes, class-classes and relations if not needed anymore
                 # Log
                 insert_into_log(project_id, request.user.id, 'remove_element', None, 'Removed classification with ID %s and name %s' % (params['id'], params['title']))
 
