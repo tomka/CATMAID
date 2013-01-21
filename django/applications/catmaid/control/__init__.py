@@ -31,3 +31,4 @@ from segmentation import *
 from data_view import *
 from analytics import *
 from importer import *
+from ontology import *
