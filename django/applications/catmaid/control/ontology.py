@@ -46,6 +46,7 @@ def get_children( parent_id, max_nodes = 5000 ):
     return child_nodes
 
 @requires_user_role([UserRole.Annotate, UserRole.Browse])
+@report_error
 def get_available_relations(request, project_id=None):
     """ Returns a simple list of all relations available available
     for the given project."""
@@ -53,6 +54,7 @@ def get_available_relations(request, project_id=None):
     return HttpResponse(json.dumps(relation_map))
 
 @requires_user_role([UserRole.Annotate, UserRole.Browse])
+@report_error
 def get_available_classes(request, project_id=None):
     """ Returns a simple list of all classes available available
     for the given project."""
@@ -60,6 +62,7 @@ def get_available_classes(request, project_id=None):
     return HttpResponse(json.dumps(class_map))
 
 @requires_user_role([UserRole.Annotate, UserRole.Browse])
+@report_error
 def list_available_relations(request, project_id=None):
     """ Returns an object of all relations available available
     for the given project, prepared to work with a jsTree."""
@@ -79,6 +82,7 @@ def list_available_relations(request, project_id=None):
                          'name': r.relation_name}} for r in relations)))
 
 @requires_user_role([UserRole.Annotate, UserRole.Browse])
+@report_error
 def list_available_classes(request, project_id=None):
     """ Returns an object of all classes available available
     for the given project, prepared to work with a jsTree."""
@@ -98,6 +102,7 @@ def list_available_classes(request, project_id=None):
                          'name': c.class_name}} for c in classes)))
 
 @requires_user_role([UserRole.Annotate, UserRole.Browse])
+@report_error
 def list_ontology(request, project_id=None):
     parent_id = int(request.GET.get('parentid', 0))
     parent_name = request.GET.get('parentname', '')
@@ -174,6 +179,7 @@ def list_ontology(request, project_id=None):
         raise CatmaidException(response_on_error + ': ' + str(e))
 
 @requires_user_role([UserRole.Annotate, UserRole.Browse])
+@transaction_reportable_commit_on_success
 def add_relation_to_ontology(request, project_id=None):
     name = request.POST.get('relname', None)
     uri = request.POST.get('uri', '')
@@ -201,6 +207,7 @@ def get_number_of_inverse_links( obj ):
     return count
 
 @requires_user_role([UserRole.Annotate, UserRole.Browse])
+@transaction_reportable_commit_on_success
 def remove_relation_from_ontology(request, project_id=None):
     relid = int(request.POST.get('relid', -1))
     force = bool(int(request.POST.get('force', 0)))
@@ -216,6 +223,7 @@ def remove_relation_from_ontology(request, project_id=None):
     return HttpResponse(json.dumps({'deleted_relation': relid}))
 
 @requires_user_role([UserRole.Annotate, UserRole.Browse])
+@transaction_reportable_commit_on_success
 def remove_all_relations_from_ontology(request, project_id=None):
     force = bool(request.POST.get('force', False))
     deleted_ids = []
@@ -241,6 +249,7 @@ def remove_all_relations_from_ontology(request, project_id=None):
          'not_deleted_relations': not_deleted_ids}))
 
 @requires_user_role([UserRole.Annotate, UserRole.Browse])
+@transaction_reportable_commit_on_success
 def add_class_to_ontology(request, project_id=None):
     name = request.POST.get('classname', None)
     description = request.POST.get('description', None)
@@ -255,6 +264,7 @@ def add_class_to_ontology(request, project_id=None):
     return HttpResponse(json.dumps({'class_id': c.id}))
 
 @requires_user_role([UserRole.Annotate, UserRole.Browse])
+@transaction_reportable_commit_on_success
 def add_link_to_ontology(request, project_id=None):
     """ Creates a new class-class link.
     """
