@@ -7,8 +7,11 @@ var OntologyTree = new function()
 {
     this.init = function( pid )
     {
+        // show the classification space instead of the project
+        // related ontology
+        pid = -1;
         OntologyTree.load_ontology_tree( pid,
-            "#ontology_tree_object", "root" );
+            "#ontology_tree_object", "classification_root" );
         OntologyTree.load_ontology_relations_tree( pid,
             "#ontology_relations_tree" );
         OntologyTree.load_ontology_classes_tree( pid,
@@ -483,7 +486,7 @@ var OntologyTree = new function()
                 // the result is fed to the AJAX request `data` option
                 parameters = {
                   "pid": pid,
-                  "roots": 1, // show root classes (0 or 1)?
+                  "roots": 0, // show root classes (0 or 1)?
                   "parentid": n.attr ? n.attr("id").replace("node_", "") : 0
                 };
                 if (ObjectTree.currentExpandRequest) {
