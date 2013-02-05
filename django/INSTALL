@@ -52,8 +52,8 @@ following ways:
   * Change the absolute path in TEMPLATE_DIRS to wherever the
     templates directory in this repository.
 
-  * Change the STATICFILES_URL and STATICFILES_LOCAL variables to
-    point to the right locations.
+  * Change the STATIC_URL and STATIC_ROOT variables to point to
+    the right locations.
 
 Try running the server locally, with:
 

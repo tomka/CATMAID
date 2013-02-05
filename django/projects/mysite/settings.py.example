@@ -64,10 +64,22 @@ FORCE_SCRIPT_NAME = '/catmaid/dj'
 
 # Settings relative to the Apache subfolder
 CATMAID_URL = '/'
-STATICFILES_URL = '/static/'
-STATIC_URL = 'CATMAIDPATH/dj-static-admin/'
 
+# Static files
+# If you would like to add additional directories except the ones
+# of the installed applications (catmaid, admin), please use the
+# STATICFILES_DIRS setting. STATIC_ROOT and STATIC_URL should be
+# all you need to set in most cases.
+#
+# An absolute path to the directory where all static files get collectod to.
+STATIC_ROOT = 'CATMAIDPATH/django/static/'
+# URL to use when referring to files located in STATIC_ROOT
+STATIC_URL = 'CATMAIDURL/django/static/'
+
+# For backward compatibility
+STATICFILES_URL = '/static/'
 STATICFILES_LOCAL = 'CATMAIDPATH/django/static/'
+
 # Static path to store generated NeuroHDF files (needs to be writable)
 # as subdirectory of STATICFILES_LOCAL
 STATICFILES_HDF5_SUBDIRECTORY = 'CATMAID_WRITABLE_SUBDIR'

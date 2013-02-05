@@ -235,12 +235,12 @@ def get_skeleton_as_dataarray(project_id=None, skeleton_id=None):
 
 def get_temporary_neurohdf_filename_and_url():
     fname = ''.join([choice('abcdefghijklmnopqrstuvwxyz0123456789(-_=+)') for i in range(50)])
-    hdf_path = os.path.join(settings.STATICFILES_LOCAL, settings.STATICFILES_HDF5_SUBDIRECTORY)
+    hdf_path = os.path.join(settings.STATIC_ROOT, settings.STATICFILES_HDF5_SUBDIRECTORY)
     if not os.path.exists( hdf_path ):
         raise Exception('Need to configure writable path STATICFILES_HDF5_SUBDIRECTORY in settings_apache.py')
     filename = os.path.join('%s.h5' % fname)
     host = settings.CATMAID_DJANGO_URL.lstrip('http://').split('/')[0]
-    return os.path.join(hdf_path, filename), "http://{0}{1}".format( host, os.path.join(settings.STATICFILES_URL,
+    return os.path.join(hdf_path, filename), "http://{0}{1}".format( host, os.path.join(settings.STATIC_URL,
         settings.STATICFILES_HDF5_SUBDIRECTORY, filename) )
 
 

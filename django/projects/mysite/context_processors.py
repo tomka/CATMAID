@@ -4,4 +4,4 @@ import sys
 
 def staticfiles(request):
     from django.conf import settings
-    return { 'static': settings.STATICFILES_URL }
+    return { 'static': settings.STATIC_URL }
