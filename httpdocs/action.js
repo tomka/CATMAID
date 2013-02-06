@@ -298,6 +298,16 @@ var ontologyToolActions = [
     }
   }),
 
+  new Action({
+    helpText: "Show classification editor",
+    buttonID: "classification_editor_button",
+    buttonName: 'classification_editor',
+    run: function (e) {
+      WindowMaker.show('classification-editor');
+      return true;
+    }
+  }),
+
 ];
 
 var tracingWindowActions = [
