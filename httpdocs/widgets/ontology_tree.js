@@ -115,6 +115,29 @@ var OntologyTree = new function()
                     }
                     }
                 } else if (type_of_node === "class") {
+                    var restriction_types = JSON.parse(obj.attr("restrictions"));
+                    // create restrictions submenu
+                    add_restriction_submenu = {
+                        "add_cardinality_restriction": {
+                            "separator_before": false,
+                            "separator_after": false,
+                            "label": "Cardinality",
+                            "action": function (obj) {
+                                return OntologyTree.create_cardinality_restriction(pid, obj);
+                             }
+                        },
+                        "add_exclusivity_restriction": {
+                            "separator_before": false,
+                            "separator_after": false,
+                            "label": "Exclusivity",
+                            "action": function (obj) {
+                                // A exclusivity constraint is a cardinality constraint
+                                // that restricts to exactly one value.
+                                return OntologyTree.create_cardinality_restriction(pid, obj, 1);
+                             }
+                        }
+                    }
+
                     menu = {
                     "add_relation": {
                         "separator_before": false,
@@ -132,7 +155,16 @@ var OntologyTree = new function()
                             return OntologyTree.create_link_handler(this, pid, obj, tree_id);
                          }
                     },
-                    "remove_parent_links": {
+                    "add_restriction": {
+                        "separator_before": true,
+                        "separator_after": false,
+                        "_disabled": false,
+                        "label": "Add restriction",
+                        "submenu": add_restriction_submenu
+                    }};
+
+                    // add remove parent-link entry
+                    menu["remove_parent_links"] = {
                         "separator_before": true,
                         "separator_after": false,
                         "label": "Remove parent relation link",
@@ -143,7 +175,6 @@ var OntologyTree = new function()
                                 return OntologyTree.remove_link_handler(pid, cc_id, tree_id);
                             }
                          }
-                    }
                     }
                 } else if (type_of_node === "relation") {
                     menu = {
@@ -901,6 +932,34 @@ var OntologyTree = new function()
             handler( jsonData );
         }
     };
+
+    /**
+     * Creates a cardinality restriction
+     */
+    this.create_cardinality_restriction = function( pid, obj, cardinality ) {
+        if (!cardinality) {
+            // ask user for cardinality and type
+            OntologyTree.show_error_status( "To be implemented",
+                "Creating custom cardinal restrictions isn't supported, yet." );
+        } else {
+            // add restriction with Ajax call
+            requestQueue.register(django_url + pid + '/ontology/restrictions/add',
+                'POST', {
+                     "linkid": obj.attr("ccid"),
+                     "cardinality": cardinality,
+                     "restriction": "cardinality" },
+                function(status, data, text) {
+                    OntologyTree.handle_operation_response(status, data, text,
+                        function( jsonData ) {
+                            OntologyTree.refresh_trees();
+                            // give out some information
+                            var r_id = jsonData.new_restriction;
+                            var msg = "A new restriction with ID " + r_id + " has been created.";
+                            OntologyTree.show_error_status( "Success", msg );
+                        });
+                    });
+        }
+    }
 
     /**
      * Refreshes a tree.
