@@ -603,6 +603,34 @@ class TreenodeConnector(UserFocusedModel):
     skeleton = models.ForeignKey(ClassInstance)
     confidence = models.IntegerField(default=5)
 
+class Restriction(models.Model):
+    class Meta:
+        db_table = "restriction"
+        managed = False
+    # Repeat the columns inherited from 'concept'
+    user = models.ForeignKey(User)
+    creation_time = models.DateTimeField(default=now)
+    edition_time = models.DateTimeField(default=now)
+    project = models.ForeignKey(Project)
+    # Now new columns:
+    enabled = models.BooleanField(default=True)
+    restricted_link = models.ForeignKey(ClassClass)
+
+class CardinalityRestriction(models.Model):
+    class Meta:
+        db_table = "cardinality_restriction"
+        managed = False
+    # Repeat the columns inherited from 'restriction'
+    user = models.ForeignKey(User)
+    creation_time = models.DateTimeField(default=now)
+    edition_time = models.DateTimeField(default=now)
+    project = models.ForeignKey(Project)
+    enabled = models.BooleanField(default=True)
+    restricted_link = models.ForeignKey(ClassClass)
+    # Now new columns:
+    cardinality_type = models.IntegerField();
+    value = models.IntegerField();
+
 #class Session(models.Model):
 #    class Meta:
 #        db_table = "sessions"
