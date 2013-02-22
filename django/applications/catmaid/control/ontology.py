@@ -175,10 +175,13 @@ def list_ontology(request, project_id=None):
 
                 links = []
                 for cc in cc_q:
+                    # Get known restrictions
+                    restrictions = json.dumps( get_restrictions( cc ) )
                     # Collect standard jSTree data
                     data = {'data' : {'title': '%s (%d)' % (cc.class_a.class_name, cc.class_a.id)},
                             'attr' : {'id': 'node_%s' % cc.class_a.id,
                                       'rel': 'class',
+                                      'restrictions': restrictions,
                                       'ccid': cc.id}}
                     # Only add a 'state' field if this node has children
                     # (i.e. relations where it is class_b).
@@ -215,6 +218,22 @@ def list_ontology(request, project_id=None):
 
     except Exception as e:
         raise Exception(response_on_error + ': ' + str(e))
+
+def get_restrictions( cc_link ):
+    """ Returns a map with <restrition_type> as key and a list
+    of data structures, desribing each restriction type.
+    """
+    restrictions = {}
+    # Add cardinality restrictions
+    cardinality_restrictions_q = CardinalityRestriction.objects.filter(
+        restricted_link=cc_link)
+    for cr in cardinality_restrictions_q:
+        if 'cardinality' not in restrictions:
+            restrictions['cardinality'] = []
+        restrictions['cardinality'].append( {'id': cr.id,
+            'type': cr.cardinality_type, 'value': cr.value} )
+
+    return restrictions
 
 @requires_user_role([UserRole.Annotate, UserRole.Browse])
 @transaction_reportable_commit_on_success
