@@ -223,3 +223,7 @@ div#data_view .comment
 {
 	font-style: italic;
 }
+
+.wider-vakata-contextmenu {
+    min-width: 210px;
+}

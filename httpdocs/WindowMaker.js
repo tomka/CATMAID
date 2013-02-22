@@ -890,6 +890,11 @@ var WindowMaker = new function()
       '<div id="input_class">New class name: <input type="text" id="classname" /></div>' +
       '<div id="select_class">Available class: <select id="classid"></select></div></p>' +
       '<p><input type="button" id="cancel" value="Cancel" />' +
+      '<input type="button" id="add" value="Add" /></p></div>' +
+      '<div id="cardinality_restriction_dialog" style="display:none; cursor:default">' +
+      '<p><div id="select_type">Cardinality type: <select id="cardinality_type"></select></div>' +
+      '<div id="input_value">Cardinality value: <input type="text" id="cardinality_val" /></div></p>' +
+      '<p><input type="button" id="cancel" value="Cancel" />' +
       '<input type="button" id="add" value="Add" /></p></div>';
 
     addListener(win, container);

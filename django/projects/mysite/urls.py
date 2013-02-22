@@ -223,6 +223,8 @@ urlpatterns += patterns('',
         'catmaid.control.add_restriction'),
     (r'^(?P<project_id>%s)/ontology/restrictions/remove$' % (integer),
         'catmaid.control.remove_restriction'),
+    (r'^(?P<project_id>%s)/ontology/restrictions/(?P<restriction>[^/]*)/types$' % (integer),
+        'catmaid.control.get_restriction_types'),
     )
 
 if settings.DEBUG:

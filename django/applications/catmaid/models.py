@@ -617,6 +617,14 @@ class Restriction(models.Model):
     restricted_link = models.ForeignKey(ClassClass)
 
 class CardinalityRestriction(models.Model):
+    """ A restriction that guards the number of class instances
+    reffering explicitely to a relation in the semantic space.
+    Different types are supported:
+
+    0: The exact number of class instances is defined
+    1: A maximum number of class instances is defined
+    2: A minimum number of class instances is defined
+    """
     class Meta:
         db_table = "cardinality_restriction"
         managed = False
@@ -630,6 +638,63 @@ class CardinalityRestriction(models.Model):
     # Now new columns:
     cardinality_type = models.IntegerField();
     value = models.IntegerField();
+
+    @staticmethod
+    def get_supported_types():
+        return {
+            0: "Excactly n instances",
+            1: "Mamimum of n instances",
+            2: "Minimum of n instances"}
+
+    def get_num_class_instances(self, ci):
+        """ Returns the number of class instances, guarded by this
+        restriction.
+        """
+        return ClassInstanceClassInstance.objects.filter(class_instance_b=ci,
+            relation=self.restricted_link.relation).count()
+
+    def would_violate(self, ci, c):
+        """ Test if it would violate this restriction if a new instance
+        of <c> is linked to <ci> with the guarded link. Note: This will
+        return *false as well* if adding a new class instance would bring
+        the restriction closer to being not violated. E.g.: if exactly 3
+        elements are needed, this method would return false for the firs
+        three new class instances.
+        """
+        # Find out the number of links to types or sub-types of <c>.
+        num_linked_ci = self.get_num_class_instances(ci)
+
+        if self.cardinality_type == 0 or self.cardinality_type == 1:
+            # Type 0 and type 1: exactly <value> number of class instances
+            # can be instantiated. A new instance violates if there are
+            # already <value> or more instances.
+            too_much_items = num_linked_ci >= self.value
+            return too_much_items
+        elif self.cardinality_type == 2:
+            # Type 2: at least <value> number of class instances can be
+            # instantiated. A new instance violates never.
+            return False
+        else:
+            raise Exception("Unsupported cardinality type.")
+
+    def is_violated(self, ci, c):
+        """ Test if a restriction is currently violated.
+        """
+        # Find out the number of links to types or sub-types of <c>.
+        num_linked_ci = self.get_num_class_instances(ci)
+
+        if self.cardinality_type == 0 or self.cardinality_type == 1:
+            # Type 0 and type 1: exactly <value> number of class instances
+            # can be instantiated. A new instance violates if there are
+            # already <value> or more instances.
+            too_much_items = num_linked_ci >= self.value
+            return too_much_items
+        elif self.cardinality_type == 2:
+            # Type 2: at least <value> number of class instances can be
+            # instantiated. A new instance violates never.
+            return False
+        else:
+            raise Exception("Unsupported cardinality type.")
 
 #class Session(models.Model):
 #    class Meta:
