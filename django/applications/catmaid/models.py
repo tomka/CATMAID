@@ -624,6 +624,7 @@ class CardinalityRestriction(models.Model):
     0: The exact number of class instances is defined
     1: A maximum number of class instances is defined
     2: A minimum number of class instances is defined
+    3: The exact number of class instances for each sub-type is defined
     """
     class Meta:
         db_table = "cardinality_restriction"
@@ -642,16 +643,22 @@ class CardinalityRestriction(models.Model):
     @staticmethod
     def get_supported_types():
         return {
-            0: "Excactly n instances",
+            0: "Exactly n instances",
             1: "Mamimum of n instances",
-            2: "Minimum of n instances"}
+            2: "Minimum of n instances",
+            3: "Exactly n instances of each sub-type"}
 
-    def get_num_class_instances(self, ci):
+    def get_num_class_instances(self, ci, ctype=None):
         """ Returns the number of class instances, guarded by this
         restriction.
         """
-        return ClassInstanceClassInstance.objects.filter(class_instance_b=ci,
-            relation=self.restricted_link.relation).count()
+        if ctype is None:
+            return ClassInstanceClassInstance.objects.filter(class_instance_b=ci,
+                relation=self.restricted_link.relation).count()
+        else:
+            return ClassInstanceClassInstance.objects.filter(class_instance_b=ci,
+                relation=self.restricted_link.relation,
+                class_instance_a__class_column=ctype).count()
 
     def would_violate(self, ci, c):
         """ Test if it would violate this restriction if a new instance
@@ -661,37 +668,42 @@ class CardinalityRestriction(models.Model):
         elements are needed, this method would return false for the firs
         three new class instances.
         """
-        # Find out the number of links to types or sub-types of <c>.
-        num_linked_ci = self.get_num_class_instances(ci)
-
         if self.cardinality_type == 0 or self.cardinality_type == 1:
             # Type 0 and type 1: exactly <value> number of class instances
             # can be instantiated. A new instance violates if there are
             # already <value> or more instances.
+            num_linked_ci = self.get_num_class_instances(ci)
             too_much_items = num_linked_ci >= self.value
             return too_much_items
         elif self.cardinality_type == 2:
             # Type 2: at least <value> number of class instances can be
             # instantiated. A new instance violates never.
             return False
+        elif self.cardinality_type == 3:
+            # Type 3: exactly <value> number of class instances are allowed
+            # for each sub-type. A new instance violates if there are already
+            # <value> or more instances of a certain type.
+            num_linked_ci = self.get_num_class_instances(ci, c)
+            too_much_items = num_linked_ci >= self.value
+            return too_much_items
         else:
             raise Exception("Unsupported cardinality type.")
 
-    def is_violated(self, ci, c):
+    def is_violated(self, ci):
         """ Test if a restriction is currently violated.
         """
-        # Find out the number of links to types or sub-types of <c>.
-        num_linked_ci = self.get_num_class_instances(ci)
-
         if self.cardinality_type == 0 or self.cardinality_type == 1:
             # Type 0 and type 1: exactly <value> number of class instances
             # can be instantiated. A new instance violates if there are
             # already <value> or more instances.
+            num_linked_ci = self.get_num_class_instances(ci)
             too_much_items = num_linked_ci >= self.value
             return too_much_items
         elif self.cardinality_type == 2:
             # Type 2: at least <value> number of class instances can be
             # instantiated. A new instance violates never.
+            return False
+        elif self.cardinality_type == 3:
             return False
         else:
             raise Exception("Unsupported cardinality type.")
