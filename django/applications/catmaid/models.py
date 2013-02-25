@@ -644,7 +644,7 @@ class CardinalityRestriction(models.Model):
     def get_supported_types():
         return {
             0: "Exactly n instances",
-            1: "Mamimum of n instances",
+            1: "Maximum of n instances",
             2: "Minimum of n instances",
             3: "Exactly n instances of each sub-type"}
 
