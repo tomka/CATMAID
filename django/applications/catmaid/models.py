@@ -692,18 +692,24 @@ class CardinalityRestriction(models.Model):
     def is_violated(self, ci):
         """ Test if a restriction is currently violated.
         """
-        if self.cardinality_type == 0 or self.cardinality_type == 1:
-            # Type 0 and type 1: exactly <value> number of class instances
-            # can be instantiated. A new instance violates if there are
-            # already <value> or more instances.
+        if self.cardinality_type == 0:
             num_linked_ci = self.get_num_class_instances(ci)
-            too_much_items = num_linked_ci >= self.value
-            return too_much_items
+            return num_linked_ci != self.value
+        elif self.cardinality_type == 1:
+            num_linked_ci = self.get_num_class_instances(ci)
+            return num_linked_ci > self.value
         elif self.cardinality_type == 2:
-            # Type 2: at least <value> number of class instances can be
-            # instantiated. A new instance violates never.
-            return False
+            num_linked_ci = self.get_num_class_instances(ci)
+            return num_linked_ci < self.value
         elif self.cardinality_type == 3:
+            # Get all sub-types of c
+            subclass_links_q = ClassClass.objects.filter(
+                project_id=ci.project_id, class_b=ci.class_column,
+                relation__relation_name='is_a')
+            for link in subclass_links_q:
+                num_linked_ci = self.get_num_class_instances(ci, link.class_a)
+                if num_linked_ci != self.value:
+                    return True
             return False
         else:
             raise Exception("Unsupported cardinality type.")
