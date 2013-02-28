@@ -625,6 +625,8 @@ class CardinalityRestriction(models.Model):
     1: A maximum number of class instances is defined
     2: A minimum number of class instances is defined
     3: The exact number of class instances for each sub-type is defined
+    4: The maximum number of class instances for each sub-type is defined
+    5: The minimum number of class instances for each sub-type is defined
     """
     class Meta:
         db_table = "cardinality_restriction"
@@ -643,10 +645,12 @@ class CardinalityRestriction(models.Model):
     @staticmethod
     def get_supported_types():
         return {
-            0: "Exactly n instances",
-            1: "Maximum of n instances",
-            2: "Minimum of n instances",
-            3: "Exactly n instances of each sub-type"}
+            0: "Exactly n instances of any sub-type",
+            1: "Maximum of n instances of any sub-type",
+            2: "Minimum of n instances of any sub-type",
+            3: "Exactly n instances of each sub-type",
+            4: "Maximum n instances of each sub-type",
+            5: "Minimum n instances of each sub-type"}
 
     def get_num_class_instances(self, ci, ctype=None):
         """ Returns the number of class instances, guarded by this
@@ -679,19 +683,29 @@ class CardinalityRestriction(models.Model):
             # Type 2: at least <value> number of class instances can be
             # instantiated. A new instance violates never.
             return False
-        elif self.cardinality_type == 3:
-            # Type 3: exactly <value> number of class instances are allowed
-            # for each sub-type. A new instance violates if there are already
-            # <value> or more instances of a certain type.
+        elif self.cardinality_type == 3 or self.cardinality_type == 4:
+            # Type 3 and type 4: exactly <value> number of class instances are
+            # allowed for each sub-type. A new instance violates if there are
+            # already <value> or more instances of a certain type.
             num_linked_ci = self.get_num_class_instances(ci, c)
             too_much_items = num_linked_ci >= self.value
             return too_much_items
+        elif self.cardinality_type == 5:
+            # Type 5: at maximum <value> number of class instances are allowed
+            # for each sub-type. A new insatnce violates never.
+            return False
         else:
             raise Exception("Unsupported cardinality type.")
 
     def is_violated(self, ci):
         """ Test if a restriction is currently violated.
         """
+        def get_subclass_links_qs():
+            # Get all sub-types of c
+            return ClassClass.objects.filter(
+                project_id=ci.project_id, class_b=ci.class_column,
+                relation__relation_name='is_a')
+
         if self.cardinality_type == 0:
             num_linked_ci = self.get_num_class_instances(ci)
             return num_linked_ci != self.value
@@ -702,13 +716,25 @@ class CardinalityRestriction(models.Model):
             num_linked_ci = self.get_num_class_instances(ci)
             return num_linked_ci < self.value
         elif self.cardinality_type == 3:
-            # Get all sub-types of c
-            subclass_links_q = ClassClass.objects.filter(
-                project_id=ci.project_id, class_b=ci.class_column,
-                relation__relation_name='is_a')
+            # Exactly n for each sub type
+            subclass_links_q = get_subclass_links()
             for link in subclass_links_q:
                 num_linked_ci = self.get_num_class_instances(ci, link.class_a)
                 if num_linked_ci != self.value:
+                    return True
+        elif self.cardinality_type == 4:
+            # Max n for each sub type
+            subclass_links_q = get_subclass_links()
+            for link in subclass_links_q:
+                num_linked_ci = self.get_num_class_instances(ci, link.class_a)
+                if num_linked_ci > self.value:
+                    return True
+        elif self.cardinality_type == 5:
+            # Min n for each sub type
+            subclass_links_q = get_subclass_links()
+            for link in subclass_links_q:
+                num_linked_ci = self.get_num_class_instances(ci, link.class_a)
+                if num_linked_ci < self.value:
                     return True
             return False
         else:
