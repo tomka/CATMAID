@@ -883,6 +883,46 @@ var WindowMaker = new function()
   };
 
 
+  var createOntologyWidget = function()
+  {
+    var win = new CMWWindow( "Ontology editor" );
+    var content = win.getFrame();
+    content.style.backgroundColor = "#ffffff";
+
+    var container = createContainer( "ontology_editor_widget" );
+    content.appendChild( container );
+
+    container.innerHTML =
+      '<input type="button" id="refresh_ontology_tree" value="refresh" style="display:block; float:left;" />' +
+      '<br clear="all" />' +
+      '<div id="ontology_tree_name"><h4>Ontology</h4>' +
+      '<div id="ontology_tree_object"></div></div>' +
+      '<div id="ontology_relations_name"><h4>Relations</h4>' +
+      '<div id="ontology_relations_tree"></div></div>' +
+      '<div id="ontology_classes_name"><h4>Classes</h4>' +
+      '<div id="ontology_classes_tree"></div></div>' +
+      '<div id="ontology_add_dialog" style="display:none; cursor:default">' +
+      '<p><div id="input_rel">New relation name: <input type="text" id="relname" /></div>' +
+      '<div id="select_rel">Available relation: <select id="relid"></select></div>' +
+      '<div id="input_class">New class name: <input type="text" id="classname" /></div>' +
+      '<div id="select_class">Available class: <select id="classid"></select></div></p>' +
+      '<p><input type="button" id="cancel" value="Cancel" />' +
+      '<input type="button" id="add" value="Add" /></p></div>' +
+      '<div id="cardinality_restriction_dialog" style="display:none; cursor:default">' +
+      '<p><div id="select_type">Cardinality type: <select id="cardinality_type"></select></div>' +
+      '<div id="input_value">Cardinality value: <input type="text" id="cardinality_val" /></div></p>' +
+      '<p><input type="button" id="cancel" value="Cancel" />' +
+      '<input type="button" id="add" value="Add" /></p></div>';
+
+    addListener(win, container);
+
+    addLogic(win);
+
+    OntologyTree.init( project.getId() );
+
+    return win;
+  };
+
   var getHelpForActions = function(actions)
   {
     var action, keys, i, k, result = '';
@@ -1114,7 +1154,8 @@ var WindowMaker = new function()
     "disclaimer": createDisclaimerWindow,
     "review-system": createReviewWindow,
     "connectivity-widget": createConnectivityWindow,
-    "adjacencymatrix-widget": createAdjacencyMatrixWindow
+    "adjacencymatrix-widget": createAdjacencyMatrixWindow,
+    "ontology-editor": createOntologyWidget
   };
 
   /** If the window for the given name is already showing, just focus it.

@@ -1477,6 +1477,23 @@ WHERE code_type = 'project_tags_data_view';
 DROP TABLE "project_user" CASCADE;
 '),
 
+        '2013-02-21T17:26:30' => new Migration(
+                'Create constraint tables for ontology',
+                "
+CREATE TABLE restriction (
+    enabled boolean DEFAULT true NOT NULL,
+    restricted_link_id bigint NOT NULL
+)
+INHERITS (concept);
+ALTER TABLE ONLY restriction
+    ADD CONSTRAINT restricted_link_fkey FOREIGN KEY (restricted_link_id) REFERENCES class_class(id);
+CREATE TABLE cardinality_restriction (
+    cardinality_type integer NOT NULL,
+    value integer NOT NULL
+)
+INHERITS (restriction);
+"),
+
 	// INSERT NEW MIGRATIONS HERE
 	// (Don't remove the previous line, or inserting migration templates
 	// won't work.)
