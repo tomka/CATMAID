@@ -130,7 +130,9 @@ class ClusteringWizard(SessionWizardView):
         # Calculate linkage matrix
         linkage_matrix = hier.linkage(dst_matrix, linkage)
         # Obtain the clustering dendrogram data
-        dendrogram = hier.dendrogram(linkage_matrix, no_plot=True)
+        graph_names = [ g.name for g in graphs ]
+        dendrogram = hier.dendrogram(linkage_matrix, no_plot=True,
+            labels=graph_names)
 
         # Create a binary_matrix with graphs attached for display
         num_graphs = len(graphs)
@@ -158,7 +160,7 @@ class ClusteringWizard(SessionWizardView):
             'bin_matrix': display_bin_matrix,
             'metric': metric,
             'dst_matrix': display_dst_matrix,
-            'dendrogram': dendrogram_json})
+            'dendrogram_json': dendrogram_json})
 
         return render_to_response('catmaid/clustering/display.html', context)
 
