@@ -78,6 +78,8 @@ class ClusteringSetupGraphs(forms.Form):
 class ClusteringSetupMath(forms.Form):
     metric = forms.ChoiceField(choices=metrics)
     linkage = forms.ChoiceField(choices=linkages)
+    merge_graphs = forms.BooleanField(initial=True,
+        required=False, label="Merge graphs targeting the same Rab")
 
 class ClusteringWizard(SessionWizardView):
     template_name = "catmaid/clustering/setup.html"
@@ -159,14 +161,53 @@ class ClusteringWizard(SessionWizardView):
         graphs = cleaned_data[2].get('classification_graphs')
         metric = str(cleaned_data[3].get('metric'))
         linkage = str(cleaned_data[3].get('linkage'))
+        merge_graphs = cleaned_data[3].get('merge_graphs')
 
         # Get selected features
         features = []
         for f_id in selected_feature_ids:
             features.append(self.features[int(f_id)])
 
+        # Prepare a list of graph names
+        graph_names = [ g.name for g in graphs ]
+
         # Create binary matrix
-        bin_matrix = numpy.array(create_binary_matrix(graphs, features))
+        bin_matrix = create_binary_matrix(graphs, features)
+        # If wanted, merge entries of same Rab
+        if merge_graphs:
+            new_bin_matrix = []
+            new_graph_names = []
+            rab_vector_idx = {}
+            # Collect vectors to merge
+            for i in range(len(graphs)):
+                g = graphs[i]
+                r_idx = g.name.rfind("Rab")
+                # Only merge graphs that have "Rab in their name
+                if r_idx == -1:
+                    new_bin_matrix.append(bin_matrix[i])
+                    new_graph_names.append = graph_names[i]
+                    continue;
+                # Find Rab number
+                rab = g.name[r_idx + 3:len(g.name)]
+                if rab not in rab_vector_idx:
+                    # If not seen yet, just append and remember
+                    rab_vector_idx[rab] = len(new_bin_matrix)
+                    new_bin_matrix.append(bin_matrix[i])
+                    new_graph_names.append("Classification for Rab" + str(rab))
+                else:
+                    # Merge into existing vector
+                    idx = rab_vector_idx[rab]
+                    for j in range(len(new_bin_matrix[idx])):
+                        if bin_matrix[i][j] == 1:
+                            new_bin_matrix[idx][j] = 1
+
+            # Make the new bin matrix the current one
+            bin_matrix = new_bin_matrix
+            graph_names = new_graph_names
+
+        # Make the binary matrix numpy compatible
+        bin_matrix = numpy.array(bin_matrix)
+
         # Calculate the distance matrix
         dst_matrix = dist.pdist(bin_matrix, metric)
         # The distance matrix now has no redundancies, but we need the square form
@@ -174,22 +215,21 @@ class ClusteringWizard(SessionWizardView):
         # Calculate linkage matrix
         linkage_matrix = hier.linkage(bin_matrix, linkage, metric)
         # Obtain the clustering dendrogram data
-        graph_names = [ g.name for g in graphs ]
         dendrogram = hier.dendrogram(linkage_matrix, no_plot=True,
             count_sort=True, labels=graph_names)
 
         # Create a binary_matrix with graphs attached for display
         num_graphs = len(graphs)
         display_bin_matrix = []
-        for i in range( num_graphs ):
+        for i in range(len(graph_names)):
             display_bin_matrix.append(
-                {'graph': graphs[i], 'feature': bin_matrix[i]})
+                {'title': graph_names[i], 'feature': bin_matrix[i]})
 
         # Create dst_matrix with graphs attached
         display_dst_matrix = []
-        for i in range(num_graphs):
+        for i in range(len(graph_names)):
             display_dst_matrix.append(
-                {'graph': graphs[i], 'distances': dst_matrix[i]})
+                {'title': graph_names[i], 'distances': dst_matrix[i]})
 
         # Create a JSON version of the dendrogram to make it
         # available to the client.
@@ -199,7 +239,7 @@ class ClusteringWizard(SessionWizardView):
         context = RequestContext(self.request)
         context.update({
             'ontologies': ontologies,
-            'graphs': graphs,
+            'graph_names': graph_names,
             'features': features,
             'bin_matrix': display_bin_matrix,
             'metric': metric,

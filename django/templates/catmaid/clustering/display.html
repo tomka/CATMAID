@@ -40,7 +40,7 @@
 				</tr>
 				{% for bin_row in bin_matrix %}
 				<tr>
-					<td>{{ bin_row.graph.name }}</td>
+					<td>{{ bin_row.title }}</td>
 					{% for elem in bin_row.feature %}
 						<td>{{ elem|floatformat:0 }}</td>
 					{% endfor %}
@@ -57,13 +57,13 @@
 			<table class="indented" id="distance_matrix">
 				<tr>
 					<td></td>
-					{% for g in graphs %}
-						<td>{{ g.name }}</td>
+					{% for gn in graph_names %}
+						<td>{{ gn }}</td>
 					{% endfor %}
 				</tr>
 				{% for dst_row in dst_matrix %}
 				<tr>
-					<td>{{ dst_row.graph.name }}</td>
+					<td>{{ dst_row.title }}</td>
 					{% for elem in dst_row.distances %}
 						{% if forloop.counter < forloop.parentloop.counter %}
 							<td class="lowertriangle">{{ elem|floatformat:3 }}</td>
