@@ -7,7 +7,7 @@ from django.db.models import Q
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.formtools.wizard.views import SessionWizardView
-from django.forms.widgets import CheckboxSelectMultiple
+from django.forms.widgets import CheckboxSelectMultiple, SubWidget
 from django.http import HttpResponse
 from django.views.generic import TemplateView
 from django.shortcuts import get_object_or_404, render_to_response
@@ -1116,7 +1116,6 @@ def infer_new_instances( workspace_pid, link, parent_ci ):
             cr = cr_q[0]
             # Simple case: one instance per sub-type
             if cr.cardinality_type == 3 and cr.value == 1:
-                print("CR: %d" % cr.id)
                 # Iterate all sub-types
                 sub_class_links = get_class_links_qs(workspace_pid, 'is_a',
                     link.class_a)
@@ -1343,6 +1342,7 @@ class ClassificationSearchWizard(SessionWizardView):
                 "are combined with a logical <em>AND</em>. Feature sets of " \
                 "<em>different</em> ontologies are combined with a " \
                 "logical <em>OR</em>."
+            extra_context['feature_dict'] = self.feature_dict
         elif self.steps.current == 'layout':
             extra_context['description'] = \
                 "This steps allows you to specify the layout of the search " \
@@ -1367,11 +1367,41 @@ class ClassificationSearchWizard(SessionWizardView):
             # Featurs are abstract concepts (classes) and graphs will be
             # checked which classes they have instanciated.
             raw_features = []
+            feature_dict = {}
             for o in ontologies:
-                raw_features = raw_features + get_features(o,
+                # Get features and sort them by length of their actual path
+                # elements. This is needed for building up an hierarchical
+                # structure.
+                features = get_features(o,
                     self.workspace_pid, graphs=None, add_nonleafs=True,
                     only_used_features=False)
+                features.sort(key=lambda f: len(f.links))
+                # Build up a hierarchical dictionary of features, start with a
+                # dictionary of the root's children. Each entry maps a level's
+                # name to an object containing the feature and its children.
+                feature_dict[o.class_name] = {}
+                # Iterate all children of which each is one potential path from
+                # the root to a leaf.
+                for h, feature in enumerate(features):
+                    d = feature_dict[o.class_name]
+                    for i, e in enumerate(feature.links):
+                        # Get existing sub tree or create new one. This
+                        # expects the shortest features to be first.
+                        this_level = d.get(e.class_a.class_name, None)
+                        if not this_level:
+                            this_level = {
+                                'feature': feature,
+                                'children': {},
+                                'list_idx': len(raw_features) + h,
+                            }
+                            d[e.class_a.class_name] = this_level
+                        # Continue with the next level
+                        d = this_level.get('children')
+                # Fill raw feature list
+                raw_features = raw_features + features
+
             self.features = raw_features
+            self.feature_dict = feature_dict
             # Build form array
             features = []
             for i, f in enumerate(raw_features):
@@ -1379,6 +1409,12 @@ class ClassificationSearchWizard(SessionWizardView):
                 features.append((i, name))
             # Add form array to form field
             form.fields['features'].choices = features
+
+            #from django.utils.encoding import force_text
+            #for ov, ol in features:
+            #    print('OV: %s' % ov)
+            #    for o in ol:
+            #        print('OL: %s' % str(ol))
 
         return form
 
@@ -1490,6 +1526,51 @@ class ClassificationSearchWizard(SessionWizardView):
         return render_to_response('catmaid/classification/search_report.html',
                                   context)
 
+
+class MyChoiceFieldRenderer(ChoiceFieldRenderer):
+
+    def __iter__(self):
+        for i, choice in enumerate(self.choices):
+            yield self.choice_input_class(self.name, self.value, self.attrs.copy(), choice, i)
+
+    def __getitem__(self, idx):
+        choice = self.choices[idx] # Let the IndexError propogate
+        return self.choice_input_class(self.name, self.value, self.attrs.copy(), choice, idx)
+
+
+class MyCheckboxSelectMultiple():
+
+    def render(self, name, value, attrs=None, choices=()):
+        """
+        Outputs a <ul> for this set of choice fields.
+        If an id was given to the field, it is applied to the <ul> (each
+        item in the list will get an id of `$id_$i`).
+        """
+        id_ = self.attrs.get('id', None)
+        start_tag = format_html('<ul id="{0}">', id_) if id_ else '<ul>'
+        output = [start_tag]
+        for widget in self:
+            output.append(format_html('<li>{0}</li>', force_text(widget)))
+        output.append('</ul>')
+        return mark_safe('\n'.join(output))
+
+    def __iter__(self):
+        for i, choice in enumerate(self.choices):
+            yield self.choice_input_class(self.name, self.value, self.attrs.copy(), choice, i)
+
+    def __getitem__(self, idx):
+        choice = self.choices[idx] # Let the IndexError propogate
+        return self.choice_input_class(self.name, self.value, self.attrs.copy(), choice, idx)
+
+    def value_from_datadict(self, data, files, name):
+        if isinstance(data, (MultiValueDict, MergeDict)):
+            return data.getlist(name)
+        return data.get(name, None)
+
+    def __str__(self):
+        return self.render()
+
+
 class FeatureSetupForm(forms.Form):
     """ This form displays all available classification_root based ontologies
     in one tree structure. All ontologies can be graphs per se, but this form
@@ -1497,7 +1578,7 @@ class FeatureSetupForm(forms.Form):
     elements as nodes.
     """
     features = forms.MultipleChoiceField(choices=[],
-            widget=CheckboxSelectMultiple(attrs={'class': 'autoselectable'}))
+            widget=MyCheckboxSelectMultiple(attrs={'class': 'autoselectable'}))
 
 
 class LayoutSetupForm(forms.Form):

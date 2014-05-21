@@ -1,4 +1,5 @@
 {% load i18n %}
+{% load classification %}
 
 <p>Step {{ wizard.steps.step1 }} of {{ wizard.steps.count }}</p>
 <p>{{ description|safe }}</p>
@@ -14,18 +15,21 @@
   {% csrf_token %}
   {{ wizard.management_form }}
 
-  {% if wizard.form.forms %}
-    {{ wizard.form.management_form }}
-    {% for form in wizard.form.forms %}
-        {{ form.as_p }}
-    {% endfor %}
-  {% else %}
-    {{ wizard.form.as_p }}
-  {% endif %}
-
   {% if wizard.steps.current == "features" %}
     {# Add extra div for feature selection on 'features' step #}
-    <div class="classification-search-features"></div>
+    <div class="classification-search-features">
+        <ul>
+            {{ feature_dict|feature_dict_to_html|safe }}
+        </ul>
+    </div>
+    {% if wizard.form.forms %}
+        {{ wizard.form.management_form }}
+        {% for form in wizard.form.forms %}
+            {{ form.as_p }}
+        {% endfor %}
+    {% else %}
+        {{ wizard.form.as_p }}
+    {% endif %}
   {% endif %}
 
   <p>
