@@ -273,7 +273,7 @@ SkeletonAnnotations.SVGOverlay = function(stack) {
 // If the equal ratio between stack, SVG viewBox and overlay DIV size is not
 // maintained, this additional attribute would be necessary:
 // this.paper.attr('preserveAspectRatio', 'xMinYMin meet')
-  this.graphics = new SkeletonElements(this.paper);
+  this.graphics = new SkeletonElements(this.paper, this.stack);
 };
 
 SkeletonAnnotations.SVGOverlay.prototype = {};
@@ -512,6 +512,10 @@ SkeletonAnnotations.SVGOverlay.prototype.activateNearestNode = function () {
   return nearestnode;
 };
 
+/**
+ * Iterate all nodes to find the closest one to the given position (which is in
+ * the project space).
+ */
 SkeletonAnnotations.SVGOverlay.prototype.findNodeWithinRadius = function (x, y, z, radius) {
   var xdiff, ydiff, zdiff, distsq, mindistsq = radius * radius, nearestnode = null, node, nodeid;
   for (nodeid in this.nodes) {
@@ -1015,8 +1019,8 @@ SkeletonAnnotations.SVGOverlay.prototype.refreshNodesFromTuples = function (jso,
     // a[8]: user_id, a[6]: radius, a[7]: skeleton_id, a[8]: user can edit or not
     this.nodes[a[0]] = this.graphics.newNode(
       a[0], null, a[1], a[6], this.phys2pixX(a[2]),
-      this.phys2pixY(a[3]), this.phys2pixZ(a[4]),
-      (a[4] - pz) / this.stack.resolution.z, a[5], a[7], a[8]);
+      this.phys2pixY(a[3]), this.phys2pixZ(a[4]), pz,
+      a[5], a[7], a[8]);
   }, this);
 
   // Populate ConnectorNodes

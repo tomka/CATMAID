@@ -27,8 +27,10 @@ d3.selection.prototype.show = function () {
 };
 
 /** Namespace where SVG element instances are created, cached and edited. */
-var SkeletonElements = function(paper)
+var SkeletonElements = function(paper, stack)
 {
+  var types = ['Node', 'ConnectorNode', 'ArrowLine'];
+
   // Create definitions for reused elements and markers
   var defs = paper.append('defs');
 
@@ -36,12 +38,21 @@ var SkeletonElements = function(paper)
   // required by their instances. Even though called statically, initDefs is an
   // instance (prototype) method so that we can get overriding inheritance of
   // pseudo-static variables.
-  var concreteElements = [
-    SkeletonElements.prototype.Node.prototype,
-    SkeletonElements.prototype.ConnectorNode.prototype,
-    SkeletonElements.prototype.ArrowLine.prototype,
-  ];
+  var concreteElements = types.map(function(t) {
+    return SkeletonElements.prototype[t].prototype;
+  });
+
   concreteElements.forEach(function (klass) {klass.initDefs(defs);});
+
+  // Inject a new transformer prototype between each type and their original
+  // prototypes. This allows for light-weight stack orientation aware
+  // transforming functions in each type's prototype.
+  types.forEach(function(t) {
+    Transformer.prototype = SkeletonElements.prototype[t].prototype;
+    var transformer = new Transformer(stack.orientation);
+    SkeletonElements.prototype[t].prototype = transformer;
+  });
+
 
   this.cache = {
     nodePool : new this.ElementPool(100),
@@ -120,16 +131,16 @@ var SkeletonElements = function(paper)
     x,          // the x coordinate in oriented project coordinates
     y,          // the y coordinate in oriented project coordinates
     z,          // the z coordinate in oriented project coordinates
-    zdiff,      // the difference in Z from the current slice in stack space
+    section,    // the compenent of the current section in project space
     confidence,
     skeleton_id,// the id of the skeleton this node is an element of
     can_edit)   // a boolean combining (is_superuser or user owns the node)
   {
     var node = this.cache.nodePool.next();
     if (node) {
-      node.reInit(id, parent, parent_id, radius, x, y, z, zdiff, confidence, skeleton_id, can_edit);
+      node.reInit(id, parent, parent_id, radius, x, y, z, section, confidence, skeleton_id, can_edit);
     } else {
-      node = new this.Node(paper, id, parent, parent_id, radius, x, y, z, zdiff, confidence, skeleton_id, can_edit);
+      node = new this.Node(paper, id, parent, parent_id, section, x, y, z, zdiff, confidence, skeleton_id, can_edit);
       this.cache.nodePool.push(node);
     }
     return node;
@@ -162,6 +173,39 @@ var SkeletonElements = function(paper)
 ////// Definition of classes used in SkeletonElements
 
 SkeletonElements.prototype = {};
+
+SkeletonElements.prototype.Transformer = function(stack)
+{
+  /* Convert node coordinates to project coordinates and vice versa. Both use
+  * physical coordinates, but for nodes X, Y and Z always algins with the stack's
+  * X, Y and Z coordinates. Nodes are therefore dependend on the stacks
+  * orientation.
+  */
+  switch (stack.orientation)
+  {
+    case Stack.ORIENTATION_XZ:
+      this.projectToNodeX = function( z, y, x ) { return x; };
+      this.projectToNodeY = function( z, y, x ) { return z; };
+      this.projectToNodeZ = function( z, y, x ) { return y; };
+      break;
+    case Stack.ORIENTATION_ZY:
+      this.projectToNodeX = function( z, y, x ) { return z; };
+      this.projectToNodeY = function( z, y, x ) { return y; };
+      this.projectToNodeZ = function( z, y, x ) { return x; };
+      break;
+    default:
+      this.projectToNodeX = function( z, y, x ) { return x; };
+      this.projectToNodeY = function( z, y, x ) { return y; };
+      this.projectToNodeZ = function( z, y, x ) { return z; };
+  }
+  // The inverse functions are the same, because coordinates get only swapped.
+  this.nodeToProjectX = this.projectToNodeX;
+  this.nodeToProjectY = this.projectToNodeY;
+  this.nodeToProjectZ = this.projectToNodeZ;
+
+  // Convert from nm to px, using the stack's resolution of the given compoenent
+  this.physicalToPixelZ(v) { return v / stack.resolution.z; };
+};
 
   /** For reusing objects such as DOM elements, which are expensive to insert and remove. */
 SkeletonElements.prototype.ElementPool = function(reserve_size) {
@@ -222,8 +266,8 @@ SkeletonElements.prototype.NodePrototype = new (function() {
   /** Update the local x,y coordinates of the node
    * and for its SVG object c well. */
   this.setXY = function(xnew, ynew) {
-    this.x = xnew;
-    this.y = ynew;
+    this.x = this.nodeToProjectX(this.z, this.y, xnew);
+    this.y = this.nodeToProjectY(this.z, ynew, this.x);
     if (this.c) {
       this.c.attr({
         x: xnew,
@@ -242,8 +286,8 @@ SkeletonElements.prototype.NodePrototype = new (function() {
       // create a circle object
       this.c = this.paper.append('use')
                           .attr('xlink:href', '#' + this.USE_HREF)
-                          .attr('x', this.x)
-                          .attr('y', this.y)
+                          .attr('x', this.projectToNodeX(this.z, this.y, this.x))
+                          .attr('y', this.projectToNodeY(this.z, this.y, this.x))
                           .classed('overlay-node', true);
 
       SkeletonElements.prototype.mouseEventManager.attach(this.c, this.type);
@@ -375,8 +419,10 @@ SkeletonElements.prototype.AbstractTreenode = function() {
     }
 
     this.line.attr({
-        x1: this.x, y1: this.y,
-        x2: this.parent.x, y2: this.parent.y,
+        x1: this.projectToNodeX(this.z, this.y, this.x),
+        y1: this.projectToNodeY(this.z, this.y, this.x),
+        x2: this.projectToNodeX(this.parent.z, this.parent.y, this.parent.x),
+        y2: this.projectToNodeY(this.parent.z, this.parent.y, this.parent.x),
         stroke: lineColor,
         'stroke-width': this.EDGE_WIDTH
     });
@@ -387,7 +433,10 @@ SkeletonElements.prototype.AbstractTreenode = function() {
     if (this.confidence < 5) {
       // Create new or update
       this.number_text = this.updateConfidenceText(
-          this.x, this.y, this.parent.x, this.parent.y,
+          this.projectToNodeX(this.z, this.y, this.x),
+          this.projectToNodeY(this.z, this.y, this.x),
+          this.projectToNodeX(this.parent.z, this.parent.y, this.parent.x),
+          this.projectToNodeY(this.parent.z, this.parent.y, this.parent.x),
           lineColor,
           this.confidence,
           this.number_text);
@@ -501,7 +550,10 @@ SkeletonElements.prototype.AbstractTreenode = function() {
       if (0 !== zdiff) {
         this.c.hide();
       } else {
-        this.c.attr({x: x, y: y});
+        this.c.attr({
+          x: this.projectToNodeX(z, y, x),
+          y: this.projectToNodeY(z, y, x)
+        });
       }
     }
     if (this.line) {
@@ -523,8 +575,8 @@ SkeletonElements.prototype.AbstractTreenode = function() {
     var color = "rgb(255,255,0)";
     var c = this.paper.append('circle')
       .attr({
-        cx: this.x,
-        cy: this.y,
+        cx: this.projectToNodeX(this.z, this.y, this.x),
+        cy: this.projectToNodeY(this.z, this.y, this.x),
         r: 0,
         fill: "none",
         stroke: color,
@@ -533,8 +585,8 @@ SkeletonElements.prototype.AbstractTreenode = function() {
     // Create an adhoc mouse catcher
     var mc = this.paper.append('circle')
       .attr({
-        cx: this.x,
-        cy: this.y,
+        cx: this.projectToNodeX(this.z, this.y, this.x),
+        cy: this.projectToNodeY(this.z, this.y, this.x),
         r: '300%',
         fill: color,  // If opacity is zero it must have a fillcolor, otherwise the mouse events ignore it
         stroke: "none",
@@ -598,7 +650,7 @@ SkeletonElements.prototype.Node = function(
   x,          // the x coordinate in pixels
   y,          // y coordinates in pixels
   z,          // z coordinates in pixels
-  zdiff,      // the difference in z from the current slice
+  section,      // the difference in z from the current slice
   confidence, // confidence with the parent
   skeleton_id,// the id of the skeleton this node is an element of
   can_edit)   // whether the user can edit (move, remove) this node
@@ -614,7 +666,7 @@ SkeletonElements.prototype.Node = function(
   this.x = x;
   this.y = y;
   this.z = z;
-  this.zdiff = zdiff;
+  this.zdiff = this.projectToNodeZ(z, y, x) - section;
   this.confidence = confidence;
   this.skeleton_id = skeleton_id;
   this.can_edit = can_edit;
@@ -743,7 +795,10 @@ SkeletonElements.prototype.AbstractConnectorNode = function() {
     if (this.c) {
       this.c.datum(id);
       if (this.shouldDisplay()) {
-        this.c.attr({x: x, y: y});
+        this.c.attr({
+          x: this.projectToNodeX(z, y, x),
+          y: this.projectToNodeY(z, y, x),
+        });
       } else {
         this.c.hide();
       }
@@ -892,11 +947,12 @@ SkeletonElements.prototype.mouseEventManager = new (function()
     if (o.id !== SkeletonAnnotations.getActiveNodeId()) return;
     if (!checkNodeID(this)) return;
 
-    node.x += d3.event.dx;
-    node.y += d3.event.dy;
+    node.x += this.nodeToProjectX(node.z, d3.event.dy, d3.event.dx);
+    node.y += this.nodeToProjectY(node.z, d3.event.dy, d3.event.dx);
+    node.y += this.nodeToProjectZ(node.z, d3.event.dy, d3.event.dx);
     node.c.attr({
-      x: node.x,
-      y: node.y
+      x: this.projectToNodeX(node.z, node.y, node.x),
+      y: this.projectToNodeY(node.z, node.y, node.x),
     });
     node.drawEdges(true); // TODO for connector this is overkill
     statusBar.replaceLast("Moving node #" + node.id);
@@ -940,6 +996,7 @@ SkeletonElements.prototype.mouseEventManager = new (function()
       catmaidSVGOverlay.activateNode(node);
     }
 
+    // FIX?
     o = {ox: node.x,
          oy: node.y,
          id: node.id};
@@ -1125,9 +1182,19 @@ SkeletonElements.prototype.ArrowLine.prototype = new (function() {
   this.init = function(connector, node, confidence, is_pre) {
     this.line.datum({connector_id: connector.id, treenode_id: node.id});
     if (is_pre) {
-      this.update(node.x, node.y, connector.x, connector.y, is_pre, confidence, connector.NODE_RADIUS);
+      this.update(
+        this.projectToNodeX(node.z, node.y, node.x),
+        this.projectToNodeY(node.z, node.y, node.x),
+        this.projectToNodeX(connector.z, connector.y, connector.x),
+        this.projectToNodeY(connector.z, connector.y, connector.x),
+        is_pre, confidence, connector.NODE_RADIUS);
     } else {
-      this.update(connector.x, connector.y, node.x, node.y, is_pre, confidence, node.NODE_RADIUS);
+      this.update(
+        this.projectToNodeX(connector.z, connector.y, connector.x),
+        this.projectToNodeY(connector.z, connector.y, connector.x),
+        this.projectToNodeX(node.z, node.y, node.x),
+        this.projectToNodeY(node.z, node.y, node.x),
+        is_pre, confidence, node.NODE_RADIUS);
     }
   };
 
