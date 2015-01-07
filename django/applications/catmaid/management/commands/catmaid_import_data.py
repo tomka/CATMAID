@@ -11,8 +11,12 @@ class FileImporter:
         self.target = target
         self.options = options
         self.user = user
+        self.keep_ids = bool(options['keep_ids'])
 
         self.format = 'json'
+
+    def get_models_with_fkeys(self):
+        return []
 
     @transaction.atomic
     def import_data(self):
@@ -23,6 +27,15 @@ class FileImporter:
         cursor = connection.cursor()
         # Defer all constraint checks
         cursor.execute('SET CONSTRAINTS ALL DEFERRED')
+
+        # Create an ID mapping dictonary, which is used to map old to new IDs,
+        # if old IDs should not be kept.
+        concept_ids = dict()
+        location_ids = dict()
+
+        # Create a mapping of models that have foreign key relations to other
+        # models (or itself).
+        has_fkey = get_models_with_fkeys()
 
         # Read the file and import data
         with open(self.source, "r") as data:
@@ -40,7 +53,19 @@ class FileImporter:
                     if hasattr(obj, 'editor_id'):
                         obj.editor = self.user
 
-                deserialized_object.save()
+                if self.keep_ids:
+                    deserialized_object.save()
+                else:
+                    # Check for foreign keys
+                    try:
+                        if (has_fkey[obj]):
+                            pass
+                        else:
+                            # Save model right away and record changed ID
+                            deserialized_object.obj.id = None
+                            deserialized_object.save()
+
+        # Save all models that could not be saved immediately
 
         # Reset counters to current maximum IDs
         cursor.execute('''
@@ -89,6 +114,8 @@ class Command(NoArgsCommand):
             action='store_true', help='Import tags from source'),
         make_option('--notags', dest='import_tags',
             action='store_false', help='Don\'t import tags from source'),
+        make_option('--keepids', dest='keep_ids', default=False,
+            action='store_true', help='Don\'t create new IDs for imported data'),
         )
 
     def ask_for_project(self, title):
