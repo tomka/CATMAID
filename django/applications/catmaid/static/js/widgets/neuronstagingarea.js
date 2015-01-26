@@ -926,3 +926,13 @@ SelectionTable.prototype._hex2rgb = function(hex) {
   var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)];
 };
+
+/**
+ * Creates a new rectangular selection overlay and queries all the neurons in
+ * it.
+ */
+SelectionTable.prototype.loadFromRectangularSelection = function()
+{
+  var bboxtool = new BoxSelectionTool();
+  bboxtool.register(stack);
+};

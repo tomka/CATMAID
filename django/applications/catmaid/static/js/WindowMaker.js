@@ -527,6 +527,12 @@ var WindowMaker = new function()
     load.onclick = ST.loadSource.bind(ST);
     buttons.appendChild(load);
 
+    var loadSelectionRect = document.createElement('input');
+    loadSelectionRect.setAttribute("type", "button");
+    loadSelectionRect.setAttribute("value", "Append ROI");
+    loadSelectionRect.onclick = ST.loadFromRectangularSelection.bind(ST);
+    buttons.appendChild(loadSelectionRect);
+
     var clear = document.createElement('input');
     clear.setAttribute("type", "button");
     clear.setAttribute("value", "Clear");
