@@ -16,27 +16,29 @@ class FileImporter:
 
     @transaction.atomic
     def import_data(self):
-        """ Imports data from a file and overrides irs properties, if wanted.
+        """ Imports data from a file and overrides its properties, if wanted.
         This method also deactivates auto commit (if it is activated)
         temporary.
         """
         cursor = connection.cursor()
         # Defer all constraint checks
         cursor.execute('SET CONSTRAINTS ALL DEFERRED')
+
         # Read the file and import data
         with open(self.source, "r") as data:
             for deserialized_object in serializers.deserialize(self.format, data):
+                obj = deserialized_object.object
                 # Override project to match target project
-                if hasattr(deserialized_object.object, 'project'):
-                    deserialized_object.object.project = self.target
+                if hasattr(obj, 'project'):
+                    obj.project = self.target
                 # Override user
                 if self.user:
-                    if hasattr(deserialized_object.object, 'user_id'):
-                        deserialized_object.object.user = self.user
-                    if hasattr(deserialized_object.object, 'reviewer_id'):
-                        deserialized_object.object.reviewer = self.user
-                    if hasattr(deserialized_object.object, 'editor_id'):
-                        deserialized_object.object.editor = self.user
+                    if hasattr(obj, 'user_id'):
+                        obj.user = self.user
+                    if hasattr(obj, 'reviewer_id'):
+                        obj.reviewer = self.user
+                    if hasattr(obj, 'editor_id'):
+                        obj.editor = self.user
 
                 deserialized_object.save()
 
