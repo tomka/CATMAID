@@ -1067,6 +1067,10 @@ WebGLApplication.prototype.Space = function( w, h, container, stack ) {
 
 	// WebGL space
 	this.scene = new THREE.Scene();
+  // A texture, used for picking
+  this.pickingTexture = new THREE.WebGLRenderTarget(w, h);
+  this.pickingTexture.generateMipmaps = false;
+
 	this.view = new this.View(this);
 	this.lights = this.createLights(stack.dimension, stack.resolution, this.view.camera);
 	this.lights.forEach(function(l) {
@@ -1090,6 +1094,7 @@ WebGLApplication.prototype.Space.prototype.setSize = function(canvasWidth, canva
 	this.view.camera.setSize(canvasWidth, canvasHeight);
 	this.view.camera.updateProjectionMatrix();
 	this.view.renderer.setSize(canvasWidth, canvasHeight);
+  this.pickingTexture.setSize(canvasWidth, canvasHeight);
 	if (this.view.controls) {
 		this.view.controls.handleResize();
 	}
@@ -1322,6 +1327,12 @@ WebGLApplication.prototype.Space.prototype.StaticContent = function(dimensions, 
   this.synapticColors = [new THREE.MeshBasicMaterial( { color: 0xff0000, opacity:0.6, transparent:false  } ), new THREE.MeshBasicMaterial( { color: 0x00f6ff, opacity:0.6, transparent:false  } )];
   this.connectorLineColors = {'presynaptic_to': new THREE.LineBasicMaterial({color: 0xff0000, opacity: 1.0, linewidth: 6}),
                               'postsynaptic_to': new THREE.LineBasicMaterial({color: 0x00f6ff, opacity: 1.0, linewidth: 6})};
+
+  // Compute the face normals for some of the geometries. This is needed to make
+  // picking work reliable.
+  this.labelspheregeometry.computeFaceNormals();
+  this.radiusSphere.computeFaceNormals();
+  this.icoSphere.computeFaceNormals();
 };
 
 WebGLApplication.prototype.Space.prototype.StaticContent.prototype = {};
@@ -2227,6 +2238,46 @@ WebGLApplication.prototype.Space.prototype.View.prototype.MouseControls = functi
     mouse.is_mouse_down = true;
 		if (!ev.shiftKey) return;
 
+    // Attempt to intersect visible skeleton spheres, stopping at the first found
+    var fields = ['specialTagSpheres', 'synapticSpheres', 'radiusVolumes'];
+    var skeletons = space.content.skeletons;
+
+    // Prepare all spheres for picking by coloring them with an ID.
+    Object.keys(skeletons).forEach(function(skeleton_id) {
+      var skeleton = skeletons[skeleton_id];
+      if (!skeleton.visible) return;
+      var all_spheres = fields.map(function(field) { return skeleton[field]; })
+                              .reduce(function(a, spheres) {
+                                return Object.keys(spheres).reduce(function(a, id) {
+                                  spheres[id].material.color = new THREE.Color(parseInt(id));
+                                  a.push(spheres[id]);
+                                  return a;
+                                }, a);
+                              }, []);
+    });
+
+    // Render scene to picking texture
+    var gl = space.view.renderer.getContext();
+    space.view.renderer.render(space.scene, camera, space.pickingTexture);
+    var pixelBuffer = new Uint8Array(4);
+
+    // Read pixel under cursor
+    gl.readPixels(mouse.position.x, space.pickingTexture.height - mouse.position.y, 1, 1, gl.RGBA,
+        gl.UNSIGNED_BYTE, pixelBuffer);
+
+    console.log(pixelBuffer);
+    var id = (pixelBuffer[0] << 16) | (pixelBuffer[1] << 8) | (pixelBuffer[2]);
+
+    if (0 === id) {
+      growlAlert("Oops", "Couldn't find any intersectable object under the mouse.");
+    };
+
+    //var img = createImageFromTexture(gl, null, space.pickingTexture.width, space.pickingTexture.height)
+    //var blob = CATMAID.tools.dataURItoBlob(img.src);
+    //saveAs(blob, "texture.png");
+
+    return;
+
     // Step, which is normalized screen coordinates, is choosen so that it will
     // span half a pixel width in screen space.
     var adjPxNSC = ((ev.offsetX + 1) / space.canvasWidth) * 2 - 1;
@@ -2248,10 +2299,6 @@ WebGLApplication.prototype.Space.prototype.View.prototype.MouseControls = functi
         };
       }
     })(raycaster, camera);
-
-    // Attempt to intersect visible skeleton spheres, stopping at the first found
-    var fields = ['specialTagSpheres', 'synapticSpheres', 'radiusVolumes'];
-    var skeletons = space.content.skeletons;
 
     // Iterate over all skeletons and find the ones that are intersected
     var intersectedSkeletons = Object.keys(skeletons).some(function(skeleton_id) {
@@ -2315,6 +2362,33 @@ WebGLApplication.prototype.Space.prototype.View.prototype.MouseControls = functi
   };
 };
 
+function createImageFromTexture(gl, texture, width, height) {
+    // Create a framebuffer backed by the texture
+    //var framebuffer = gl.createFramebuffer();
+    //gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    //gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+
+    // Read the contents of the framebuffer
+    var data = new Uint8Array(width * height * 4);
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, data);
+
+    //gl.deleteFramebuffer(framebuffer);
+
+    // Create a 2D canvas to store the result 
+    var canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    var context = canvas.getContext('2d');
+
+    // Copy the pixels to a 2D canvas
+    var imageData = context.createImageData(width, height);
+    imageData.data.set(data);
+    context.putImageData(imageData, 0, 0);
+
+    var img = new Image();
+    img.src = canvas.toDataURL();
+    return img;
+}
 
 WebGLApplication.prototype.Space.prototype.Content.prototype.ActiveNode = function() {
   this.skeleton_id = null;
