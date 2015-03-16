@@ -1649,8 +1649,9 @@ SkeletonAnnotations.SVGOverlay.prototype.updateNodeCoordinatesinDB = function (c
  *
  * @param jso is an array of JSON objects, where each object may specify a Node
  *            or a ConnectorNode
+ * @param extraNodes is an array of nodes that should be added additonally
  */
-SkeletonAnnotations.SVGOverlay.prototype.refreshNodesFromTuples = function (jso) {
+SkeletonAnnotations.SVGOverlay.prototype.refreshNodesFromTuples = function (jso, extraNodes) {
   // Reset nodes and labels
   this.nodes = {};
   // remove labels, but do not hide them
@@ -1658,6 +1659,14 @@ SkeletonAnnotations.SVGOverlay.prototype.refreshNodesFromTuples = function (jso)
 
   // Prepare existing Node and ConnectorNode instances for reuse
   this.graphics.resetCache();
+
+  // Add extra nodes
+  if (extraNodes) {
+    extraNodes.forEach(function(n) {
+      this.nodes[n.id] = this.graphics.newNode(n.id, null, n.parent_id, n.radius,
+          n.x, n.y, n.z, n.z - this.stack.z, n.confidence, n.skeleton_id, n.can_edit);
+    }, this);
+  };
 
   // Populate Nodes
   jso[0].forEach(function(a, index, array) {
@@ -2088,7 +2097,24 @@ SkeletonAnnotations.SVGOverlay.prototype.updateNodes = function (callback,
       }
     }
     // Include ID only in qery, if it is real
+    var extraNodes;
     if (!SkeletonAnnotations.isRealNode(atnid)) {
+      var n = self.nodes[atnid];
+      if (n) {
+        extraNodes = [{
+          id: n.id,
+          parent_id: n.parent_id,
+          radius: n.radius,
+          x: n.x,
+          y: n.y,
+          z: n.z,
+          confidence: n.confidence,
+          skeleton_id: n.skeleton_id,
+          can_edit: n.can_edit
+        }];
+      } else {
+        console.log('Could not pin virtual node before update: ' + atnid);
+      }
       atnid = -1;
     }
 
@@ -2140,7 +2166,7 @@ SkeletonAnnotations.SVGOverlay.prototype.updateNodes = function (callback,
                 json.missing_classes, json.missing_relations,
                 json.missing_classinstances);
         } else {
-          self.refreshNodesFromTuples(json);
+          self.refreshNodesFromTuples(json, extraNodes);
 
           // initialization hack for "URL to this view"
           if (SkeletonAnnotations.hasOwnProperty('init_active_node_id')) {
