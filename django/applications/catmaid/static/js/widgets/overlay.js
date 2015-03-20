@@ -825,19 +825,15 @@ SkeletonAnnotations.SVGOverlay.prototype.createTreenodeLink = function (fromid, 
           // The function used to instruct the backend to do the merge
           var merge = function(annotation_set) {
             // The call to join will reroot the target skeleton at the shift-clicked treenode
-            self.submit(
-              django_url + project.id + '/skeleton/join',
-              {
-                from_id: fromid,
-                to_id: toid,
-                annotation_set: JSON.stringify(annotation_set),
-              },
-              function (json) {
+            self.submit
+              .then(CATMAID.neuronController.joinNeurons.bind(self, project.id, from_id,
+                    to_id, annotation_set), true) // block UI
+              .then(function(json) {
+                // TODO: This and the delete event result in a double update?
                 self.updateNodes(function() {
                   self.selectNode(toid);
-                });
-              },
-              true); // block UI
+                })
+              });
           };
 
           // A method to use when the to-skeleton has multiple nodes

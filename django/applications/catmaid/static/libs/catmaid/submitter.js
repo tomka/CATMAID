@@ -117,7 +117,12 @@ var submitterFn = function() {
       if (CATMAID.tools.isFn(q.url.then)) {
         q.url.then(
           function() {
-            invoke(q, arguments);
+            // If the promise was fulfilled, execute callback, if any.
+            if (CATMAID.tools.isFn(q.fn)) {
+              invoke(q, arguments);
+            } else {
+              complete(q);
+            }
           }, function() {
             reset(q, arguments);
           });
@@ -134,7 +139,7 @@ var submitterFn = function() {
     }
   };
 
-  return function(url, post, fn, blockUI, replace, errCallback, quiet) {
+  var submit = function(url, post, fn, blockUI, replace, errCallback, quiet) {
     queue.push({url: url,
           post: post,
           fn: fn,
@@ -147,4 +152,14 @@ var submitterFn = function() {
       next();
     }
   };
+
+  /**
+   * Allow submitter to be used as a Promise as well.
+   */
+  submit.then = function(onResolve, onReject, blockUI, quiet) {
+    submit(null, null, onResolve, blockUI, false, onReject, quiet);
+    return submit;
+  }
+
+  return submit;
 };

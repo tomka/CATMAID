@@ -72,6 +72,21 @@
     }).bind(this));
   };
 
+  /**
+   * Join two skeletons.
+   */
+  NeuronController.prototype.joinNeurons = function(projectID, fromSkeletonID,
+      toSkeletonID, annotationSet) {
+    return new Promise(function(resolve, reject) {
+        django_url + project.id + '/skeleton/join',
+        {
+          from_id: fromid,
+          to_id: toid,
+          annotation_set: JSON.stringify(annotation_set),
+        }
+    });
+  };
+
   // Create a singleton instance
   CATMAID.neuronController = new NeuronController();
 
