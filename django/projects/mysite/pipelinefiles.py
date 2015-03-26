@@ -102,6 +102,7 @@ PIPELINE_JS['catmaid'] = {
         'js/tools/roitool.js',
         'js/tools/*.js',
         'js/layers/*.js',
+        'js/widgets/multi_instance_widget.js',
         'js/widgets/*.js',
     ),
     'output_filename': 'js/catmaid.js',

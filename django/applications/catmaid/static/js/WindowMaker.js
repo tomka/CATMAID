@@ -503,6 +503,45 @@ var WindowMaker = new function()
     return win;
   };
 
+  var createConnectivityMatrixWindow = function(instance) {
+    var CM = instance ? instance : new CATMAID.ConnectivityMatrix();
+    var win = createWidget(CM);
+    return win;
+  };
+
+  /**
+   * Create a general widget window for a widget instance that provides a widget
+   * configuration.
+   */
+  var createWidget = function(instance) {
+    var config = instance.getWidgetConfiguration();
+    var win = new CMWWindow(instance.getName());
+    var container = win.getFrame();
+    container.style.backgroundColor = "#ffffff";
+
+    // Create controls, if requested
+    var controls;
+    if (config.controlsID && config.createControls) {
+      var buttons = document.createElement("div");
+      buttons.setAttribute("id", config.controlsID);
+      buttons.setAttribute("class", "buttonpanel");
+      config.createControls.call(instance, buttons);
+      container.appendChild(buttons);
+    }
+
+    // Create content
+    var content = createContainer(config.contentID);
+    config.createContent.call(instance, content);
+    container.appendChild(content);
+
+    // Register to events
+    var destroy = config.destroy ? config.destroy.bind(instance) : undefined;
+    var resize = config.resize ? config.resize.bind(instance) : undefined;
+    addListener(win, content, config.controlsID, destroy, resize);
+    addLogic(win);
+
+    return win;
+  };
 
   var createStagingListWindow = function( instance, webglwin, webglwin_name ) {
 
@@ -3034,6 +3073,7 @@ var WindowMaker = new function()
     "settings": createSettingsWindow,
     "analyze-arbor": createAnalyzeArbor,
     "neuron-dendrogram": createNeuronDendrogram,
+    "connectivity-matrix": createConnectivityMatrixWindow,
   };
 
   /** If the window for the given name is already showing, just focus it.
