@@ -71,14 +71,35 @@
           colSelect.value = this.value;
         };
 
+        // Indicates if loaded skeletons should be part of a group
+        var loadAsGroup = false;
+
         /**
          * Load rows and/or coulmns and refresh.
          */
         var loadWith = function(withRows, withCols) {
-          if (withRows) this.rowDimension.loadSource();
-          if (withCols) this.colDimension.loadSource();
+          if (loadAsGroup) {
+            // TODO: Get group name
+            var groupName = "test";
+            if (withRows) this.rowDimension.loadAsGroup(groupName);
+            if (withCols) this.colDimension.loadAsGroup(groupName);
+          } else {
+            if (withRows) this.rowDimension.loadSource();
+            if (withCols) this.colDimension.loadSource();
+          }
           if (withRows || withCols) this.update();
         };
+
+        var asGroupCb = document.createElement('input');
+        asGroupCb.setAttribute('type', 'checkbox');
+        asGroupCb.checked = loadAsGroup;
+        asGroupCb.onclick = function() {
+          loadAsGroup = this.checked;
+        };
+        var asGroup = document.createElement('label');
+        asGroup.appendChild(asGroupCb);
+        asGroup.appendChild(document.createTextNode('As group'));
+        controls.appendChild(asGroup);
 
         var loadRows = document.createElement('input');
         loadRows.setAttribute("type", "button");
@@ -216,21 +237,30 @@
     var m = matrix.get();
     var nns = NeuronNameService.getInstance();
 
+    // Get group information
+    var nDisplayRows = this.rowDimension.orderedElements.length;
+    var nDisplayCols = this.colDimension.orderedElements.length;
+
     // Create table representation for connectivity matrix
     var table = document.createElement('table');
     table.setAttribute('class', 'partner_table');
     // Add column header, prepend one blank cell for row headers
     var colHeader = table.appendChild(document.createElement('tr'));
     colHeader.appendChild(document.createElement('th'));
-    for (var c=0; c<nCols; ++c) {
+    for (var c=0; c<nDisplayCols; ++c) {
+      var id = this.colDimension.orderedElements[c];
+      var isGroup = this.colDimension.groups[id];
+      var name = isGroup ? id : nns.getName(id);
       var th = document.createElement('th');
-      th.appendChild(document.createTextNode(nns.getName(
-            this.colDimension.orderedSkeletonIDs[c])));
+      th.appendChild(document.createTextNode(name));
       th.setAttribute('colspan', 2);
       colHeader.appendChild(th);
     }
     // Add row headers and connectivity matrix rows
-    for (var r=0; r<nRows; ++r) {
+    for (var r=0; r<nDisplayRows; ++r) {
+      var id = this.rowDimension.orderedElements[c];
+      var isGroup = this.rowDimension.groups[id];
+      var name = isGroup ? id : nns.getName(id);
       var rowSkid = this.rowDimension.orderedSkeletonIDs[r];
       var row = document.createElement('tr');
       table.appendChild(row);
