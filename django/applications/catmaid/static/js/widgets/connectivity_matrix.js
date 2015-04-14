@@ -12,6 +12,9 @@
     this.colDimension = new CATMAID.BasicSkeletonSource(this.getName() + " Columns");
     // Synapse counts are only displayed if they are at least that big
     this.synapseThreshold = 1;
+    // Color indices for pre and post cells, default light pre/post colors
+    this.preColor = 1;
+    this.postColor = 1;
   };
 
   ConnectivityMatrixWidget.prototype = {};
@@ -152,6 +155,34 @@
         synapseThreshold.appendChild(document.createTextNode('Syn. threshold'));
         synapseThreshold.appendChild(synapseThresholdSelect);
         controls.appendChild(synapseThreshold);
+
+        var preColorSelect = document.createElement('select');
+        for (var i=0; i < colorOptions.length; ++i) {
+          preColorSelect.options.add(
+                new Option(colorOptions[i], i, this.preColor === i));
+        }
+        preColorSelect.onchange = (function(e) {
+          this.preColor = parseInt(e.target.value, 10);
+          this.refresh();
+        }).bind(this);
+        var preColor = document.createElement('label');
+        preColor.appendChild(document.createTextNode('Pre color'));
+        preColor.appendChild(preColorSelect);
+        controls.appendChild(preColor);
+
+        var postColorSelect = document.createElement('select');
+        for (var i=0; i < colorOptions.length; ++i) {
+          postColorSelect.options.add(
+                new Option(colorOptions[i], i, this.postColor === i));
+        }
+        postColorSelect.onchange = (function(e) {
+          this.postColor = parseInt(e.target.value, 10);
+          this.refresh();
+        }).bind(this);
+        var postColor = document.createElement('label');
+        postColor.appendChild(document.createTextNode('Post color'));
+        postColor.appendChild(postColorSelect);
+        controls.appendChild(postColor);
 
         var update = document.createElement('input');
         update.setAttribute("type", "button");
@@ -512,5 +543,8 @@
   function isValidGroupName(existingNames, name) {
     return -1 === existingNames.indexOf(name);
   }
+
+  // The available color options for
+  var colorOptions = ["None", "CATMAID"].concat(Object.keys(colorbrewer));
 
 })(CATMAID);
