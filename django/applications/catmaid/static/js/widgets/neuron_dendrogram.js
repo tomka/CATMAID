@@ -5,7 +5,6 @@
   ArborParser,
   Events,
   InstanceRegistry,
-  OptionsDialog,
   project,
   requestQueue,
   SelectionTable,
@@ -778,7 +777,7 @@ NeuronDendrogram.prototype.chooseHighlightTags = function()
   }
 
   // Get all the tags for the current skeleton
-  var dialog = new OptionsDialog("Select tags to highlight");
+  var dialog = new CATMAID.OptionsDialog("Select tags to highlight");
   dialog.appendMessage("The following tags are used in the selected " +
       "skeleton. Every node labeled with at least one of the selected tags, " +
       "will be highlighted and its sub-arbor will be highlighted as well.");
