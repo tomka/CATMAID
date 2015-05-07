@@ -406,6 +406,13 @@ SettingsWidget.prototype.init = function(space)
     ds.append(createCheckboxSetting("Edit radius after node creation", function() {
       SkeletonAnnotations.setRadiusAfterNodeCreation = this.checked;
     }, SkeletonAnnotations.setRadiusAfterNodeCreation));
+    ds.append(createCheckboxSetting("Create abutting connectors", function() {
+      if (this.checked) {
+        SkeletonAnnotations.newConnectorType = SkeletonAnnotations.TYPE_ABUTTING_CONNECTORNODE;
+      } else {
+        SkeletonAnnotations.newConnectorType = SkeletonAnnotations.TYPE_SYNAPSE_CONNECTORNODE;
+      }
+    }, SkeletonAnnotations.newConnectorType === SkeletonAnnotations.TYPE_ABUTTING_CONNECTORNODE));
   };
 
 
