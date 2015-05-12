@@ -5,12 +5,40 @@ from django.db import connection, transaction
 from catmaid.control.annotationadmin import copy_annotations
 from catmaid.models import Project, User
 
-class FileImporter:
-    def __init__(self, source, target, user, options):
-        self.source = source
+
+def apply_to_foreign_key_fields(obj, fn):
+    fk_count = 0
+    for field in obj._meta.fields:
+        if field.get_internal_type() == "ForeignKey":
+            fk_count++
+            fn(obj, field)
+    return fk_count
+
+class AbstractImporter:
+
+    def __init__(self, target, user):
         self.target = target
-        self.options = options
         self.user = user
+
+    def update_object(obj):
+        # Override project to match target project
+        if hasattr(obj, 'project'):
+            obj.project = self.target
+        # Override user
+        if self.user:
+            if hasattr(obj, 'user_id'):
+                obj.user = self.user
+            if hasattr(obj, 'reviewer_id'):
+                obj.reviewer = self.user
+            if hasattr(obj, 'editor_id'):
+                obj.editor = self.user
+
+
+class FileImporter(AbstractImporter):
+    def __init__(self, source, target, user, options):
+        super(AbstractImporter, self).__init__(target, user)
+        self.source = source
+        self.options = options
 
         self.format = 'json'
 
@@ -23,22 +51,46 @@ class FileImporter:
         cursor = connection.cursor()
         # Defer all constraint checks
         cursor.execute('SET CONSTRAINTS ALL DEFERRED')
+
+        # Keep a dictionary mapping object types to dictionaries with primary
+        # key mappings. This is only used if new IDs should be created
+        id_map = defaultdict(lambda : defaultdict(int))
+
+        def map_keys(obj, field):
+            pass 
+
         # Read the file and import data
         with open(self.source, "r") as data:
-            for deserialized_object in serializers.deserialize(self.format, data):
-                # Override project to match target project
-                if hasattr(deserialized_object.object, 'project'):
-                    deserialized_object.object.project = self.target
-                # Override user
-                if self.user:
-                    if hasattr(deserialized_object.object, 'user_id'):
-                        deserialized_object.object.user = self.user
-                    if hasattr(deserialized_object.object, 'reviewer_id'):
-                        deserialized_object.object.reviewer = self.user
-                    if hasattr(deserialized_object.object, 'editor_id'):
-                        deserialized_object.object.editor = self.user
+            if self.reset_ids:
+                # First pass, create new objects with new primary keys and store
+                # mapping.
+                new_obj = None
+                old_id = None
+                for deserialized_object in serializers.deserialize(self.format, data):
+                    new_obj = deserialized_object.object
+                    old_id = new_obj.id
+                    self.update_object(new_ob)
+                    new_obj.id = None
+                    deserialized_object.save()
+                    # Map the old ID of this type the new ID
+                    id_map[type(new_obj)][old_id] = new_obj.id
 
-                deserialized_object.save()
+                # Second pass, update IDs of all objects referencing the
+                # imported data. Re-read the data without requiring everything
+                # to be kept in memory, even if it takes longer
+                for deserialized_object in serializers.deserialize(self.format, data):
+                    new_obj = deserialized_object.object
+                    # Get the new ID for this object
+                    new_obj.id = id_map[type[new_obj][new_obj.id]
+                    # Update all foreign keys
+                    apply_to_foreign_key_fields(new_obj, map_keys):
+
+            else:
+                # Insert all the update object with ID they come with,
+                # potentially overriding existing ones.
+                for deserialized_object in serializers.deserialize(self.format, data):
+                    self.update_object(deserialized_object.object)
+                    deserialized_object.save()
 
         # Reset counters to current maximum IDs
         cursor.execute('''
