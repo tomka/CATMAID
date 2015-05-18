@@ -77,13 +77,22 @@ function TracingTool()
           tracingLayer.svgOverlay.whenclicked( e );
           break;
         case 2:
+          // Attach to the node limit hit event to disable node updates
+          // temporary if the limit was hit. This allows for smoother panning
+          // when many nodes are visible.
+          tracingLayer.on(tracingLayer.EVENT_HIT_NODE_DISPLAY_LIMIT,
+              disableLayerUpdate, tracingLayer);
+
           proto_onmousedown( e );
+
           CATMAID.ui.registerEvent( "onmousemove", updateStatusBar );
           CATMAID.ui.registerEvent( "onmouseup",
             function onmouseup (e) {
               CATMAID.ui.releaseEvents();
               CATMAID.ui.removeEvent( "onmousemove", updateStatusBar );
               CATMAID.ui.removeEvent( "onmouseup", onmouseup );
+              tracingLayer.off(tracingLayer.EVENT_HIT_NODE_DISPLAY_LIMIT,
+                  disableLayerUpdate, tracingLayer);
               // Recreate nodes by feching them from the database for the new field of view
               tracingLayer.svgOverlay.updateNodes();
             });
@@ -92,6 +101,10 @@ function TracingTool()
           proto_onmousedown( e );
           break;
       }
+
+      var disableLayerUpdate = function() {
+        tracingLayer.noUpdate = true;
+      };
     };
 
     // Insert a text div for the neuron name in the canvas window title bar
