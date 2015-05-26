@@ -5,7 +5,6 @@ from catmaid import get_system_user
 from catmaid.models import Project, User
 from catmaid.conf import settings as catmaid_settings
 from catmaid.control import project
-from south import signals as south_signals
 
 
 def init_classification():
@@ -46,5 +45,5 @@ def validate_environment(app, **kwargs):
     init_classification()
 
 
-# Validate CATMAID environment after all South migrations have been run
-south_signals.post_migrate.connect(validate_environment)
+# Validate CATMAID environment after all migrations have been run
+signals.post_migrate.connect(validate_environment)

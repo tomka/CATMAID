@@ -1,7 +1,7 @@
 from django import forms
 from django.db import models
 from django.db.models import Q
-from django.db.models.signals import pre_save, post_save, post_syncdb
+from django.db.models.signals import pre_save, post_save, post_migrate
 from django.dispatch import receiver
 from datetime import datetime
 import sys
@@ -922,12 +922,12 @@ post_save.connect(add_user_to_default_groups, sender=User)
 # From http://stackoverflow.com/questions/1466827/ --
 
 from django.contrib.auth import models as auth_models
-from django.contrib.auth.management import create_superuser
+from django.contrib.auth.management.commands import createsuperuser
 
-post_syncdb.disconnect(
-    create_superuser,
+post_migrate.disconnect(
+    createsuperuser,
     sender=auth_models,
-    dispatch_uid='django.contrib.auth.management.create_superuser')
+    dispatch_uid='django.contrib.auth.management.commands.createsuperuser')
 
 
 class ChangeRequest(UserFocusedModel):

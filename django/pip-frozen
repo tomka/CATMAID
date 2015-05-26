@@ -1,4 +1,4 @@
-Django==1.6.11
+Django==1.7.10
 distribute==0.7.3
 django-devserver==0.8.0
 h5py==2.3.1
@@ -13,9 +13,9 @@ kombu==3.0.12
 PyYAML==3.10
 python-dateutil==2.1
 django-guardian==1.2.5
-django-taggit==0.11.2
+django-taggit==0.14.0
 django-adminplus==0.3
-jsonfield==1.0.0
+jsonfield==1.0.3
 python-libuuid==0.9.0
 pillow==2.3.0
 south==1.0.2
