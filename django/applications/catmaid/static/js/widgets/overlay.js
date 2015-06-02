@@ -2527,7 +2527,36 @@ SkeletonAnnotations.SVGOverlay.prototype.goToParentNode = function(treenode_id) 
     CATMAID.info("This is the root node, can't move to its parent");
     return;
   }
+
   this.moveToAndSelectNode(node.parent_id);
+};
+
+/**
+ * Move to the parent node of the given node. Usually, this is the node at the
+ * intersection between the the skeleton of the given node and the section
+ * towards its parent. If this happens to be a real node, the real node is
+ * loaded (if required) and selected, otherwise, a virtual node is selected.
+ * Optionally, the selection of virtual nodes can be disabled. This might cause
+ * a jump to a location that is farther away than one section.
+ */
+SkeletonAnnotations.SVGOverlay.prototype.goToParentNode = function(treenode_id, ignoreVirtual) {
+  if (this.isIDNull(treenode_id)) return;
+  var node = this.nodes[treenode_id];
+  if (!node) {
+    CATMAID.error("Could not find node with id #" + treenode_id);
+    return;
+  }
+  if (node.isroot) {
+    CATMAID.info("This is the root node, can't move to its parent");
+    return;
+  }
+  if (ignoreVirtual) {
+    this.moveToAndSelectNode(node.parent_id);
+  } else {
+    this.getNodeOnNextSection(node.id, node.parent_id).then((function(id) {
+      this.moveToAndSelectNode(id);
+    }).bind(this));
+  }
 };
 
 /**
@@ -2537,7 +2566,7 @@ SkeletonAnnotations.SVGOverlay.prototype.goToParentNode = function(treenode_id) 
  * @param {number} treenode_id - The node of which to select the child
  * @param {boolean} cycle - If true, subsequent calls cycle through children
  */
-SkeletonAnnotations.SVGOverlay.prototype.goToChildNode = function (treenode_id, cycle) {
+SkeletonAnnotations.SVGOverlay.prototype.goToChildNode = function (treenode_id, cycle, ignoreVirtual) {
   if (this.isIDNull(treenode_id)) return;
   // If the existing nextBranches was fetched for this treenode, reuse it to
   // prevent repeated queries when quickly alternating between child and parent.
@@ -2792,7 +2821,7 @@ SkeletonAnnotations.SVGOverlay.prototype.goToNode = function (nodeID, fn) {
           function(json) {
             var p = {x: json[1], y: json[2], z: json[3]};
             // Query child location
-            this.submit(
+            self.submit(
                 django_url + project.id + "/node/get_location",
                 {tnid: childID},
                 function(json) {
@@ -2812,6 +2841,94 @@ SkeletonAnnotations.SVGOverlay.prototype.goToNode = function (nodeID, fn) {
       CATMAID.warn("Could not find location for node " + nodeID);
     }
   }
+};
+
+/**
+ * Get the location of the intersection between the two given nodes with the
+ * given Z coordinate. Additionally, a node ID is passed to the callback, which
+ * may be no real node. A promise is returned.
+ */
+SkeletonAnnotations.SVGOverlay.prototype.getNodeOnNextSection = function (node1ID, node2ID, z) {
+  var self = this;
+
+  if (node1ID === node2ID) {
+    throw new CATMAID.ValueError("Node IDs must be different");
+  }
+
+  return new Promise(function(resolve, reject) {
+    // Shortcut: if the nodes are currently available, check if they match the
+    // requrested Z coordinate and return the first matching one.
+    var n1 = self.nodes[node1ID];
+    var n2 = self.nodes[node2ID]
+    if (n1 && n1.z === z) {
+      resolve(n1.id, n1.x, n1.y, n1.z);
+      return;
+    }
+    if (n2 && n2.z === z) {
+      resolve(n2.id, n2.x, n2.y, n2.z);
+      return;
+    }
+
+    // Promise location, either by using the existing node or getting location
+    // informmation from the backend.
+    var usedNodes = new Set();
+    var location1 = promiseLocation(node1ID, n2, usedNodes);
+    var location2 = promiseLocation(node2ID, n2, usedNodes);
+
+    // If both locations are available, find intersection at requested Z
+    Promise.all(location1, location2).then(function(locations) {
+      // Find intersection at virtual node
+      var loc1 = locations[0];
+      if (z === loc1.z) return {id: node1ID, x: loc1.x, y: loc1.y, z: loc1.z};
+      var loc2 = locations[1];
+      if (z === loc2.z) return {id: node2ID, x: loc2.x, y: loc2.y, z: loc2.z};
+      // Find intersection
+      var pos = CATMAID.tools.intersectLineWithZPlane(loc1.x, loc1.y, loc1.z,
+          loc2.x, loc2.y, loc2.z, z);
+      return [null, pos.x, pos.y, z];
+    }).then(resolve).catch(reject);
+     
+    /**
+     * Return a promise that returns the location of the node with the given ID.
+     * If a virtual node is used, its real child or parent will be used for a
+     * location query.
+     */
+    function promiseLocation(nodeID, node, usedNodes) {
+      if (node) {
+        return Promise.resolve({x: node.x, y: node.y, z: node.z});
+      } else {
+        // In case of a vitual node, use its real child. Or, if the child has
+        // been used for a node already, use its real parent.
+        if (!SkeletonAnnotations.isRealNode(nodeID)) {
+          var childID = SkeletonAnnotations.getChildOfVirtualNode(nodeID);
+          if (childID in usedNodes) {
+            nodeID = childID; 
+          } else {
+            var parentID = SkeletonAnnotations.getParentOfVirtualNode(nodeID);
+            if (parentID in usedNodes) {
+              throw new CATMAID.ValueError("Both parent and child of virtual " +
+                  "node have been used already. Running out of options.");
+
+            } else {
+              nodeID = parentID;
+            }
+          }
+        }
+
+        // To request a location, nodeID can't be virtual. This should be dealt
+        // with already, but another sanity check is done to be sure.
+        if (!SkeletonAnnotations.isRealNode(nodeID) {
+          throw new CATMAID.ValueError("Couldn't find real node for location request.");
+        }
+
+        // Request location from backend
+        var url = django_url + project.id + "/node/get_location";
+        var id = SkeletonAnnotations.isRealNode(nodeID) ? nodeID : 
+        return self.submit(url, {tnid: nodeID}, false, true, reject)
+          .then(function(json) { return {x: json[1], y: json[2], z: json[3]}; });
+      }
+    }
+  });
 };
 
 /**

@@ -10,6 +10,7 @@
     this.message = message;
   };
 
+  // TODO: Use Object.create and set constructor
   CATMAID.ValueError.prototype = new Error();
 
 })(CATMAID);
