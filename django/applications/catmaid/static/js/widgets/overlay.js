@@ -2509,7 +2509,9 @@ SkeletonAnnotations.SVGOverlay.prototype.cycleThroughBranches = function (treeno
 
   var branch = this.nextBranches.branches[currentBranch];
   var node = branch[node_index];
-  this.moveTo(node[3], node[2], node[1], this.selectNode.bind(this, node[0]));
+
+  this.getNodeOnSectionInRange(node[0], this.nextBranches.tnid, true)
+    .then((function(node) { this.moveToAndSelectNode(node.id); }).bind(this));
 };
 
 /**
@@ -2553,9 +2555,8 @@ SkeletonAnnotations.SVGOverlay.prototype.goToParentNode = function(treenode_id, 
   if (ignoreVirtual) {
     this.moveToAndSelectNode(node.parent_id);
   } else {
-    this.getNodeOnNextSection(node.id, node.parent_id).then((function(id) {
-      this.moveToAndSelectNode(id);
-    }).bind(this));
+    this.getNodeOnSectionInRange(node.id, node.parent_id, false)
+      .then((function(node) { this.moveToAndSelectNode(node.id); }).bind(this));
   }
 };
 
@@ -2844,88 +2845,108 @@ SkeletonAnnotations.SVGOverlay.prototype.goToNode = function (nodeID, fn) {
 };
 
 /**
- * Get the location of the intersection between the two given nodes with the
- * given Z coordinate. Additionally, a node ID is passed to the callback, which
- * may be no real node. A promise is returned.
+ * Get a node representing the location on a skeleton at the first section after
+ * the first of two adjacent nodes in direction of the second. If reverse is
+ * true, a node on the first section after the second node in direction of the
+ * first will be returned. More precisely, a promise is returned that is
+ * resolved once the node is available. The promise returns the node
+ * representing the location in question. Note that this node can be a virtual
+ * node if no real node is available at the given point in space. In this case,
+ * the nodes are child and parent of the virtual node. If one of the two nodes
+ * happens to be at the given Z, the respective node is returned.
  */
-SkeletonAnnotations.SVGOverlay.prototype.getNodeOnNextSection = function (node1ID, node2ID, z) {
+SkeletonAnnotations.SVGOverlay.prototype.getNodeOnSectionInRange = function (
+    childID, parentID, reverse) {
   var self = this;
 
-  if (node1ID === node2ID) {
+  if (childID === parentID) {
     throw new CATMAID.ValueError("Node IDs must be different");
   }
 
   return new Promise(function(resolve, reject) {
-    // Shortcut: if the nodes are currently available, check if they match the
-    // requrested Z coordinate and return the first matching one.
-    var n1 = self.nodes[node1ID];
-    var n2 = self.nodes[node2ID]
-    if (n1 && n1.z === z) {
-      resolve(n1.id, n1.x, n1.y, n1.z);
-      return;
-    }
-    if (n2 && n2.z === z) {
-      resolve(n2.id, n2.x, n2.y, n2.z);
-      return;
-    }
-
     // Promise location, either by using the existing node or getting location
     // informmation from the backend.
-    var usedNodes = new Set();
-    var location1 = promiseLocation(node1ID, n2, usedNodes);
-    var location2 = promiseLocation(node2ID, n2, usedNodes);
+    var usedNodes = new Set([childID, parentID]);
+    var location1 = promiseLocation(childID, usedNodes);
+    var location2 = promiseLocation(parentID, usedNodes);
 
     // If both locations are available, find intersection at requested Z
-    Promise.all(location1, location2).then(function(locations) {
-      // Find intersection at virtual node
-      var loc1 = locations[0];
-      if (z === loc1.z) return {id: node1ID, x: loc1.x, y: loc1.y, z: loc1.z};
-      var loc2 = locations[1];
-      if (z === loc2.z) return {id: node2ID, x: loc2.x, y: loc2.y, z: loc2.z};
-      // Find intersection
-      var pos = CATMAID.tools.intersectLineWithZPlane(loc1.x, loc1.y, loc1.z,
-          loc2.x, loc2.y, loc2.z, z);
-      return [null, pos.x, pos.y, z];
+    Promise.all([location1, location2]).then(function(locations) {
+      var from = reverse ? locations[1] : locations[0],
+            to = reverse ? locations[0] : locations[1],
+          toID = reverse ? parentID : childID;
+      var z = from.z + ((from.z < to.z) ? 1 : -1);
+
+      // If the target node matches this Z, return it instead of a virtual node
+      if (Math.abs(z - to.z) < 0.0001) {
+        return {id: toID, x: to.x, y: to.y, z: to.z};
+      }
+
+      // Find intersection and return virtual node
+      var pos = CATMAID.tools.intersectLineWithZPlane(from.x, from.y, from.z,
+          to.x, to.y, to.z, z);
+      var vnID = SkeletonAnnotations.getVirtualNodeID(childID, parentID, z);
+      return {id: vnID, x: pos.x, y: pos.y, z: z};
+    }).then(function(node) {
+      // Convert previous result to project cooridnates
+      return {
+        id: node.id,
+        x: self.stack.stackToProjectX(node.z, node.y, node.x),
+        y: self.stack.stackToProjectY(node.z, node.y, node.x),
+        z: self.stack.stackToProjectZ(node.z, node.y, node.x)
+      } 
     }).then(resolve).catch(reject);
-     
+
     /**
      * Return a promise that returns the location of the node with the given ID.
      * If a virtual node is used, its real child or parent will be used for a
      * location query.
      */
-    function promiseLocation(nodeID, node, usedNodes) {
+    function promiseLocation(nodeID, usedNodes) {
+      var node = self.nodes[nodeID];
       if (node) {
+        usedNodes.add(node.id);
         return Promise.resolve({x: node.x, y: node.y, z: node.z});
       } else {
         // In case of a vitual node, use its real child. Or, if the child has
-        // been used for a node already, use its real parent.
+        // been used for a node already (e.g. because is is the other node), use
+        // its real parent.
         if (!SkeletonAnnotations.isRealNode(nodeID)) {
           var childID = SkeletonAnnotations.getChildOfVirtualNode(nodeID);
-          if (childID in usedNodes) {
-            nodeID = childID; 
-          } else {
+          if (usedNodes.has(childID)) {
             var parentID = SkeletonAnnotations.getParentOfVirtualNode(nodeID);
-            if (parentID in usedNodes) {
+            if (usedNodes.has(parentID)) {
               throw new CATMAID.ValueError("Both parent and child of virtual " +
                   "node have been used already. Running out of options.");
-
             } else {
               nodeID = parentID;
             }
+          } else {
+            nodeID = childID;
+          }
+          // To request a location, nodeID can't be virtual. This should be dealt
+          // with already, but another sanity check is done to be sure.
+          if (!SkeletonAnnotations.isRealNode(nodeID)) {
+            throw new CATMAID.ValueError("Couldn't find real node for location request.");
           }
         }
 
-        // To request a location, nodeID can't be virtual. This should be dealt
-        // with already, but another sanity check is done to be sure.
-        if (!SkeletonAnnotations.isRealNode(nodeID) {
-          throw new CATMAID.ValueError("Couldn't find real node for location request.");
-        }
+        // Mark node as used
+        usedNodes.add(nodeID);
 
-        // Request location from backend
+        // Request location from backend if the node is not available already
+        node = self.nodes[nodeID];
+        
         var url = django_url + project.id + "/node/get_location";
-        var id = SkeletonAnnotations.isRealNode(nodeID) ? nodeID : 
         return self.submit(url, {tnid: nodeID}, false, true, reject)
-          .then(function(json) { return {x: json[1], y: json[2], z: json[3]}; });
+          .then(function(json) {
+            return { 
+              id: json[0],
+              x: self.stack.projectToStackX(json[3], json[2], json[1]),
+              y: self.stack.projectToStackY(json[3], json[2], json[1]),
+              z: self.stack.projectToStackZ(json[3], json[2], json[1])
+            };
+          });
       }
     }
   });
