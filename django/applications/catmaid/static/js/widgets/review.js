@@ -31,6 +31,8 @@
     self.virtualNodeStep = 1;
     // Keep track of last virtual node step, if any
     var skipStep = null;
+    // Keep track of the last movement direction
+    var lastMoveWasBackward = null;
 
 
     this.init = function() {
@@ -108,6 +110,8 @@
      * Remove all review state information and clear content.
      */
     this.endReview = function() {
+      skipStep = null;
+      lastMoveWasBackward = null;
       self.skeleton_segments = null;
       self.current_segment = null;
       self.current_segment_index = 0;
@@ -124,6 +128,8 @@
      * @param {number} id - The index of the segment, 0-based.
      */
     this.initReviewSegment = function( id ) {
+      skipStep = null;
+      lastMoveWasBackward = null;
       // Reset movement flags
       this.segmentUnfocused = false;
       this.movedBeyondSegment = false;
@@ -198,7 +204,7 @@
             ln = skipStep;
             // If the existing skipping step was created with the current node
             // as source, the current test node needs to be the virtual node.
-            if (skipStep.to !== sequence[newIndex]) {
+            if (lastMoveWasBackward !== null && !lastMoveWasBackward) {
               newIndex = self.current_segment_index;
             }
           } else {
@@ -212,6 +218,7 @@
           // point for the distance test. Steps are sections in the currently
           // focused stack.
           skipStep = self.limitMove(ln, cn, true);
+          lastMoveWasBackward = true;
           if (skipStep) {
             // Move to skipping step
             this.goToNodeOfSegmentSequence(skipStep, forceCentering);
@@ -372,13 +379,14 @@
         var ln, cn;
         if (skipStep) {
           ln = skipStep;
-          if (skipStep.to !== sequence[newIndex]) {
+          if (lastMoveWasBackward) {
             newIndex = Math.min(self.current_segment_index + 1, sequenceLength - 1);
           }
         } else {
           ln = sequence[newIndex - 1];
         }
         cn = sequence[newIndex];
+        lastMoveWasBackward = false;
 
         skipStep = self.limitMove(ln, cn, false);
         if (skipStep) {
