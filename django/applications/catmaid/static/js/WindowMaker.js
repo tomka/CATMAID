@@ -820,6 +820,7 @@ var WindowMaker = new function()
         table.notifyLink(skeleton);
       })
       .on("click", "td .action-changecolor", ST, function(e) {
+        return false;
         var table = e.data;
         var skeletonID = rowToSkeletonID(this);
         var skeleton = table.skeletons[table.skeleton_ids[skeletonID]];
