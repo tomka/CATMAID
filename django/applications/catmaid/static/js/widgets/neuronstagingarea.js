@@ -10,7 +10,8 @@
   session,
   SkeletonAnnotations,
   User,
-  WindowMaker
+  WindowMaker,
+  Set
 */
 
 "use strict";
@@ -814,6 +815,7 @@ SelectionTable.prototype.GUI.prototype.update = function() {
     var data = $(this).DataTable().rows({order: 'current'}).data().toArray();
     // Before data is written back, we make sure the widget contains the same
     // data as the table.
+    /* jshint validthis: true */
     function inSet(d) { return this.has(d.skeleton.id); }
     var skeleton_ids = Object.keys(widget.skeleton_ids).map(Number);
     if (data.length != skeleton_ids.length ||
