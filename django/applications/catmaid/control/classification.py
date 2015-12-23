@@ -5,13 +5,14 @@ from collections import defaultdict
 from django import forms
 from django.db.models import Q
 from django.conf import settings
-from django.contrib.formtools.wizard.views import SessionWizardView
 from django.forms.widgets import CheckboxSelectMultiple
 from django.http import HttpResponse
 from django.views.generic.base import TemplateView
 from django.shortcuts import get_object_or_404, render_to_response
 from django.contrib.contenttypes.models import ContentType
 from django.template.context import RequestContext
+
+from formtools.wizard.views import SessionWizardView
 
 from catmaid.control.common import get_class_to_id_map, \
         get_relation_to_id_map, insert_into_log
