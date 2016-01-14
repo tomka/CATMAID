@@ -406,9 +406,20 @@
 
     // Get nodes
     var arbor = arborParser.arbor;
-
     var split = {};
-    split[nodeId] = true;
+
+    // Downstream now contains the split node as root. Since we want to render
+    // both upstream and downstream connected to this node, we have to use a
+    // copy in the upstream representation. At the same time, we want to respect
+    // virtual nodes and do the actual split there.
+    if (SkeletonAnnotations.isRealNode(nodeId)) {
+      split[nodeId] = true;
+    } else {
+      // Use parent of virtual node for split
+      var parent = SkeletonAnnotations.getParentOfVirtualNode(nodeId);
+      split[parent] = true;
+    }
+
     var fragments = arbor.split(split);
     var downstream = fragments[0];
     var upstream = fragments[1];
