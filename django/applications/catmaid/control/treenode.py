@@ -8,7 +8,7 @@ import re
 from collections import defaultdict
 
 from django.db import connection
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 
 from rest_framework.decorators import api_view
 
@@ -327,11 +327,29 @@ def update_radius(request, project_id=None, treenode_id=None):
     option = int(request.POST.get('option', 0))
     cursor = connection.cursor()
 
+    def create_update_response(nodes):
+        return JsonResponse({
+            'success': True,
+            'updated_nodes': nodes
+        })
+
+    updated_nodes = {}
+
     if 0 == option:
-        # Update radius only for the treenode
-        Treenode.objects.filter(pk=treenode_id).update(editor=request.user,
-                                                       radius=radius)
-        return HttpResponse(json.dumps({'success': True}))
+        # Update radius only for the passed in treenode and return the old
+        # radius.
+        cursor.execute('''
+            UPDATE treenode
+            SET radius = %s
+            FROM (SELECT radius FROM treenode WHERE id = %s) old
+            WHERE id = %s
+            RETURNING old.radius)
+        ''', (radius, treenode_id, treenode_id))
+        updated_rows = cursor.fetchall()
+        if 0 == len(updated_rows):
+            raise ValueError('Coudn\'t find treenode #' + treenode_id)
+        updated_nodes[treenode_id] = updated_rows[0][0]
+        return create_update_response(updated_nodes)
 
     cursor.execute('''
     SELECT id, parent_id, radius
