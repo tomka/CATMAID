@@ -33,6 +33,8 @@
     this.animationRequestId = undefined;
     // The current animation, if any
     this.animation = undefined;
+    // Map loaed volume IDs to removal functions
+    this.loadedVolumes = {};
 
     // Listen to changes of the active node
     SkeletonAnnotations.on(SkeletonAnnotations.EVENT_ACTIVE_NODE_CHANGED,
@@ -1492,6 +1494,13 @@
       }, self.space);
       self.space.render();
     };
+  };
+
+  /**
+   * Show or hide a stored volume with a given Id.
+   */
+  WebGLApplication.prototype.showVolume = function(volumeId, visible) {
+    // Try to load volume
   };
 
   /** Defines the properties of the 3d space and also its static members like the bounding box and the missing sections. */

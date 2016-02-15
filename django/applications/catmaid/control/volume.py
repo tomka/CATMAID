@@ -230,7 +230,7 @@ def volume_detail(request, project_id, volume_id):
             raise ValueError("Couldn't create bounding box for geometry")
         bbox = map(float, bbox_matches.groups())
 
-        return Response({
+        volume = {
             'id': volume[0],
             'project_id': volume[1],
             'name': volume[2],
@@ -243,7 +243,9 @@ def volume_detail(request, project_id, volume_id):
                 'min': {'x': bbox[0], 'y': bbox[1], 'z': bbox[2]},
                 'max': {'x': bbox[3], 'y': bbox[4], 'z': bbox[5]}
             }
-        })
+        }
+
+        return Response(volume)
     elif request.method == 'POST':
         return update_volume(request, project_id=project_id, volume_id=volume_id)
 
