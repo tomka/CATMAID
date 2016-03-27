@@ -142,6 +142,8 @@ Miscellaneous:
 - Scroll bar positions in widgets are now maintained when they change their
   size.
 
+- Clustering over large sets of ontology based classification is now much faster.
+
 
 ### Bug fixes
 
