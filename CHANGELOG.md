@@ -134,6 +134,16 @@ Undo:
   change, connector link/unlink and node add/insert/move/remove/.
 
 
+Ontologies, classification and clustering:
+
+- Ontology tool widgets don't reset each other anymore if they are loaded.
+
+- The Classification Editor and Ontology Editor open sub-trees now quicker.
+
+- Clustering ontology based classifications is much faster and works for
+  multi-level ontologies on thousands of classification graphs.
+
+
 Miscellaneous:
 
 - Which layers are hidden when Space is held is now configurable by checkboxes
@@ -141,8 +151,6 @@ Miscellaneous:
 
 - Scroll bar positions in widgets are now maintained when they change their
   size.
-
-- Clustering over large sets of ontology based classification is now much faster.
 
 
 ### Bug fixes
