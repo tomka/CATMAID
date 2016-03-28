@@ -1122,6 +1122,9 @@ function handle_load_dataview(status, text, xml) {
     {
       //! add new content
       data_view_container.innerHTML = text;
+      $("img.lazy", data_view_container).lazyload({
+        container: $(data_view_container)
+      });
     } else {
       // create error message
       var error_paragraph = document.createElement( "p" );
