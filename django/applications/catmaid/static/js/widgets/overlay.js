@@ -3065,8 +3065,8 @@ SkeletonAnnotations.TracingOverlay.prototype.editRadius = function(treenode_id, 
     self.promiseNode(treenode_id).then(function(nodeId) {
       return self.submit().then(Promise.resolve.bind(Promise, nodeId));
     }).then(function(nodeId) {
-      return CATMAID.commands.execute(new CATMAID.UpdateNodeRadiusCommand(
-            self.getNodeState(nodeId), project.id, nodeId, radius, updateMode));
+      return CATMAID.commands.execute(new CATMAID.UpdateNodeRadiusCommand(self.state,
+            project.id, nodeId, radius, updateMode));
     }).catch(CATMAID.handleError);
   }
 

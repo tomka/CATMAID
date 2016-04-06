@@ -323,14 +323,24 @@
   CATMAID.UpdateNodeRadiusCommand = CATMAID.makeCommand(function(
         state, projectId, nodeId, radius, updateMode) {
 
+    var umNode = state.getNode(nodeId);
+
     var exec = function(done, command) {
-      var updateRadius = CATMAID.Nodes.updateRadius(state, projectId, nodeId,
+      // Map nodes to current ID and time
+      var mNode = map.getWithTime(map.NODE, umNode[0], umNode[1]);
+      var execState = new CATMAID.LocalState([mNode.value, mNode.timestamp]);
+      var updateRadius = CATMAID.Nodes.updateRadius(execState, projectId, nodeId,
           radius, updateMode);
 
       return updateRadius.then(function(result) {
         // The returned updatedNodes list contains objects with a node id and
         // the old radius.
         command.store("updatedNodes", result.updatedNodes);
+        // update stored state of mapped nodes
+        result.updatedNodes.forEach(function(n) {
+          //map.add(map.NODE, map.
+        });
+
         done();
         return result;
       });
