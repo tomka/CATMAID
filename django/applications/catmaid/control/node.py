@@ -44,6 +44,7 @@ def node_list_tuples(request, project_id=None, provider=None):
     # top: the Y coordinate of the bounding box (field of view) in calibrated units
     # left: the X coordinate of the bounding box (field of view) in calibrated units
     atnid = int(request.POST.get('atnid', -1))
+    atntype = int(request.POST.get('atntype', None))
     for p in ('top', 'left', 'bottom', 'right', 'z1', 'z2'):
         params[p] = float(request.POST.get(p, 0))
     # Limit the number of retrieved treenodes within the section
@@ -53,7 +54,7 @@ def node_list_tuples(request, project_id=None, provider=None):
 
     provider = get_treenodes_postgis
 
-    return node_list_tuples_query(request.user, params, project_id, atnid,
+    return node_list_tuples_query(request.user, params, project_id, atnid, atntype,
                                   includeLabels, provider)
 
 
@@ -164,7 +165,7 @@ def get_treenodes_postgis(cursor, params):
     return cursor.fetchall()
 
 
-def node_list_tuples_query(user, params, project_id, atnid, includeLabels, tn_provider):
+def node_list_tuples_query(user, params, project_id, atnid, atntype, includeLabels, tn_provider):
     try:
         cursor = connection.cursor()
 
@@ -267,13 +268,11 @@ def node_list_tuples_query(user, params, project_id, atnid, includeLabels, tn_pr
 
         crows.extend(cursor.fetchall())
 
-        connectors = []
-        # A set of missing treenode IDs
+        # A set of missing treenode and connector IDs
         missing_treenode_ids = set()
-        # Check if the active treenode is present; if not, load it
-        if -1 != atnid and atnid not in treenode_ids:
-            # If atnid is a connector, it doesn't matter, won't be found in treenode table
-            missing_treenode_ids.add(atnid)
+        missing_connector_ids = set()
+
+        connectors = []
         # A set of unique connector IDs
         connector_ids = set()
 
@@ -316,6 +315,12 @@ def node_list_tuples_query(user, params, project_id, atnid, includeLabels, tn_pr
             connectors[i] = (cid, c[1], c[2], c[3], c[4], links[cid], c[11],
                     is_superuser or c[10] == user_id or c[10] in domain)
 
+        # Check if the active treenode or connector is present; if not, load it
+        if atnid and -1 != atnid:
+            if atntype == 'treenode' and atnid not in treenode_ids:
+                missing_treenode_ids.add(atnid)
+            elif atntype == 'connector' and atnid not in connectors:
+                missing_treenode_ids.add(atnid)
 
         # Fetch missing treenodes. These are related to connectors
         # but not in the bounding box of the field of view.
@@ -344,6 +349,9 @@ def node_list_tuples_query(user, params, project_id, atnid, includeLabels, tn_pr
                 treenodes.append(row)
                 treenode_ids.add(row[0:9] + (is_superuser or row[9] == user_id
                     or row[9] in domain,))
+
+        if missing_connector_ids:
+            pass
 
         labels = defaultdict(list)
         if includeLabels:
