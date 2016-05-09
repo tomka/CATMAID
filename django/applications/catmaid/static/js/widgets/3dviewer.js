@@ -1954,11 +1954,13 @@
     // Shared across skeletons
     this.labelspheregeometry = new THREE.OctahedronGeometry(32, 3);
     this.radiusSphere = new THREE.OctahedronGeometry(10, 3);
+    //this.labelspheregeometry = new THREE.SphereBufferGeometry(32, 8, 8);
+    //this.radiusSphere = new THREE.SphereBufferGeometry(10, 8, 8);
     this.icoSphere = new THREE.IcosahedronGeometry(1, 2);
     this.cylinder = new THREE.CylinderGeometry(1, 1, 1, 10, 1, false);
     this.textMaterial = new THREE.MeshNormalMaterial();
 
-    // Mesh materials for spheres on nodes tagged with 'uncertain end', 'undertain continuation' or 'TODO'
+    // Mesh materials for spheres on nodes tagged with 'uncertain end', 'uncertain continuation' or 'TODO'
     this.updateDynamicMaterials(options, false);
     this.textGeometryCache = new WebGLApplication.prototype.Space.prototype.TextGeometryCache(options);
     this.connectorLineColors = {'presynaptic_to': new THREE.LineBasicMaterial({color: 0xff0000, opacity: 1.0, linewidth: 6}),
@@ -3587,9 +3589,9 @@
 
   /**
    * Dispose the skeleton's geometry and material, the connector geometry
-   * (connector material is shared) and remove all actor and spehere meshes from
+   * (connector material is shared) and remove all actor and sphere meshes from
    * the scene. If @collection is given it is expected to be an array and meshes
-   * won't be removed, but added to it. It is then the responsibiliy of the
+   * won't be removed, but added to it. It is then the responsibility of the
    * caller to remove the objects from the scene.
    *
    * @param collection Optional array to collect meshes to be removed
@@ -3613,6 +3615,10 @@
         }
       }
     }, meshes);
+
+    if (this.synapticSphereCollection) {
+      meshes.push(this.synapticSphereCollection);
+    }
 
     // If no collection was given, remove objects right away
     if (!collection) {
@@ -4721,7 +4727,7 @@
   };
 
   /* The itype is 0 (pre) or 1 (post), and chooses from the two arrays: synapticTypes and synapticColors. */
-  WebGLApplication.prototype.Space.prototype.Skeleton.prototype.createSynapticSphere = function(v, itype, scaling) {
+  WebGLApplication.prototype.Space.prototype.Skeleton.prototype.createSynapticSphere = function(v, itype, scaling, target) {
     if (this.synapticSpheres.hasOwnProperty(v.node_id)) {
       // There already is a synaptic sphere at the node
       return;
@@ -4731,8 +4737,13 @@
     mesh.node_id = v.node_id;
     mesh.type = this.synapticTypes[itype];
     CATMAID.tools.setXYZ(mesh.scale, scaling);
-    this.synapticSpheres[v.node_id] = mesh;
-    this.space.add( mesh );
+    if (target) {
+      mesh.updateMatrix();
+      target.merge(mesh.geometry, mesh.matrix);
+    } else {
+      this.synapticSpheres[v.node_id] = mesh;
+      this.space.add(mesh);
+    }
   };
 
 
@@ -4767,6 +4778,9 @@
     var material = new Material( { color: this.getActorColorAsHex(), opacity:1.0, transparent:false } );
     material.opacity = this.skeletonmodel.opacity;
     material.transparent = material.opacity !== 1;
+
+    // Collect all labels first, before creating its geometry
+    var labels = [];
 
     // Create edges between all skeleton nodes
     // and a sphere on the node if radius > 0
@@ -4830,7 +4844,7 @@
       }
       if (!lean && node[7] < 5) {
         // Edge with confidence lower than 5
-        this.createLabelSphere(v1, this.space.staticContent.labelColors.uncertain, options.skeleton_node_scaling);
+        labels.push([v1, this.space.staticContent.labelColors.uncertain]);
       }
     }, this);
 
@@ -4852,6 +4866,7 @@
     // Create edges between all connector nodes and their associated skeleton nodes,
     // appropriately colored as pre- or postsynaptic.
     // If not yet there, create as well the sphere for the node related to the connector
+    var mergedConnectorsGeometry = new THREE.Geometry();
     connectors.forEach(function(con) {
       // con[0]: treenode ID
       // con[1]: connector ID
@@ -4863,8 +4878,17 @@
       v1.node_id = con[1];
       var v2 = vs[con[0]];
       this.createEdge(v1, v2, this.synapticTypes[con[2]]);
-      this.createSynapticSphere(v2, con[2], options.skeleton_node_scaling);
+      this.createSynapticSphere(v2, con[2], options.skeleton_node_scaling, mergedConnectorsGeometry);
     }, this);
+
+    // Merge mesh of all synaptic spheres
+    if (mergedConnectorsGeometry) {
+      var bg = new THREE.BufferGeometry();
+      bg.fromGeometry(mergedConnectorsGeometry);
+      this.synapticSphereCollection= new THREE.Mesh(bg, new THREE.MeshNormalMaterial());
+      this.space.add(this.synapticSphereCollection);
+    }
+
 
     // Place spheres on nodes with special labels, if they don't have a sphere there already
     var customTagRe = new RegExp(options.custom_tag_spheres_regex || 'a^');
@@ -4874,26 +4898,138 @@
         if (-1 !== tagLC.indexOf('todo')) {
           this.tags[tag].forEach(function(nodeID) {
             if (!this.specialTagSpheres[nodeID]) {
-              this.createLabelSphere(vs[nodeID], this.space.staticContent.labelColors.todo,
-                options.skeleton_node_scaling);
+              labels.push([vs[nodeID], this.space.staticContent.labelColors.todo]);
             }
           }, this);
         } else if (-1 !== tagLC.indexOf('uncertain')) {
           this.tags[tag].forEach(function(nodeID) {
             if (!this.specialTagSpheres[nodeID]) {
-              this.createLabelSphere(vs[nodeID], this.space.staticContent.labelColors.uncertain,
-                options.skeleton_node_scaling);
+              labels.push([vs[nodeID], this.space.staticContent.labelColors.uncertain]);
             }
           }, this);
         } else if (customTagRe.test(tagLC)) {
           this.tags[tag].forEach(function(nodeID) {
             if (!this.specialTagSpheres[nodeID]) {
-              this.createLabelSphere(vs[nodeID], this.space.staticContent.labelColors.custom,
-                options.skeleton_node_scaling);
+              labels.push([vs[nodeID], this.space.staticContent.labelColors.custom]);
             }
           }, this);
         }
       }
+    }
+
+    // Create label geometry, if needed
+    if (labels.length > 0) {
+      var labelGeometry = new THREE.BufferGeometry();
+      var nPointsPerLabel = this.space.staticContent.labelspheregeometry.vertices.length;
+      var facesOfLabel = this.space.staticContent.labelspheregeometry.faces;
+      var nFacesPerLabel = facesOfLabel.length;
+      var boFactory = new WebGLApplication.BufferObjectFactory(labelGeometry, nPointsPerLabel);
+
+      var IndexType      = indexCount > 65535 ? Uint32Array : Uint16Array;
+      var indexCount     = labels.length * nFacesPerLabel * 3;
+      var labelIndices   = new IndexType(indexCount);
+
+      var labelPositions = new Float32Array(labels.length * nPointsPerLabel * 3);
+      var labelNormals   = new Float32Array(labels.length * nPointsPerLabel * 3);
+      var labelColors    = new Float32Array(labels.length * nPointsPerLabel * 3);
+      var labelVisible   = new Float32Array(labels.length * nPointsPerLabel);
+
+      // Create actual label geometry data based on the static label sphere
+      // geometry instance.
+      var labelTemplateGeometry = this.space.staticContent.labelspheregeometry;
+      var labelMesh = new THREE.Mesh(labelTemplateGeometry);
+      var labelVertex = new THREE.Vector3();
+      var labelNormal = new THREE.Vector3();
+      for (var li=0, max=labels.length; li<max; ++li) {
+        var label = labels[li];
+        var v = label[0];
+        if (this.specialTagSpheres.hasOwnProperty(v.node_id)) {
+          // There already is a tag sphere at the node
+          return;
+        }
+        labelMesh.position.set(v.x, v.y, v.z);
+        //CATMAID.tools.setXYZ(mesh.scale, scaling);
+        labelMesh.updateMatrix();
+
+        var start = li * nPointsPerLabel * 3;
+        for (var j=0; j<nPointsPerLabel; ++j) {
+          labelVertex.copy(labelTemplateGeometry.vertices[j]);
+          labelVertex.applyMatrix4(labelMesh.matrix);
+
+          var vIndex =  start + j * 3;
+          labelPositions[vIndex + 0] = labelVertex.x;
+          labelPositions[vIndex + 1] = labelVertex.y;
+          labelPositions[vIndex + 2] = labelVertex.z;
+
+          labelColors[vIndex + 0] = 1.0;
+          labelColors[vIndex + 1] = 0.0;
+          labelColors[vIndex + 2] = 0.0;
+
+          labelVisible[li * nPointsPerLabel + j] = 1.0;
+        }
+
+        for (var j=0; j<facesOfLabel.length; ++j) {
+          var offset = j * 3;
+          labelIndices[offset + 0] = facesOfLabel[j].a;
+          labelIndices[offset + 1] = facesOfLabel[j].b;
+          labelIndices[offset + 2] = facesOfLabel[j].c;
+
+          var normal = facesOfLabel[j].normal;
+          labelNormals[offset + 0] = normal.x;
+          labelNormals[offset + 1] = normal.y;
+          labelNormals[offset + 2] = normal.z;
+        }
+
+        this.specialTagSpheres[v.node_id] = boFactory.create(start);
+      }
+
+      // Create buffer geometry
+      labelGeometry.setIndex(new THREE.BufferAttribute(labelIndices, 3));
+      labelGeometry.addAttribute('position', new THREE.BufferAttribute(labelPositions, 3));
+      labelGeometry.addAttribute('normal', new THREE.BufferAttribute(labelNormals, 3));
+      labelGeometry.addAttribute('color', new THREE.BufferAttribute(labelColors, 3));
+      labelGeometry.addAttribute('visible', new THREE.BufferAttribute(labelVisible, 1));
+
+      labelGeometry.computeBoundingSphere();
+      labelGeometry.computeVertexNormals();
+
+      var labelMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+          alpha: { type: 'f', value: 0.5 }
+        },
+        vertexShader: [
+          'attribute float visible;',
+          'varying float vVisible;',
+          'attribute vec3 color;',
+          'varying vec3 vColor;',
+
+          'void main() {',
+          '   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
+          '   vColor = color;',
+          '   vVisible = visible;',
+          '}'
+        ].join('\n'),
+        fragmentShader: [
+          'uniform float alpha;',
+          'varying float vVisible;',
+          'varying vec3 vColor;',
+
+          'void main() {',
+          '  if (vVisible > 0.0) {',
+          '    gl_FragColor = vec4(vColor, alpha);',
+          '  } else {',
+          '    discard;',
+          '  }',
+          '}'
+        ].join('\n'),
+        side: THREE.DoubleSide,
+        depthTest: true,
+        depthWrite: false,
+        transparent: true,
+      });
+
+      this.specialTagSphereCollection = new THREE.Mesh(labelGeometry, labelMaterial);
+      this.space.add(this.specialTagSphereCollection);
     }
 
     if (options.resample_skeletons) {
@@ -5654,6 +5790,40 @@
     }).bind(this);
 
     dialog.show(400, 300, false);
+  };
+
+  /**
+   * Wrap a group of vertices in a buffer geometry as an individual 3D object
+   */
+  WebGLApplication.BufferObjectFactory= function(buffer, length) {
+    this.buffer = buffer;
+    this.length = length;
+
+    this.BufferObject = function(start) {
+      this.start = start;
+      this._isVisible = true;
+    };
+
+    this.BufferObject.prototype.buffer = buffer;
+    this.BufferObject.prototype.length = length;
+
+    Object.defineProperty(this.BufferObject.prototype, 'visible', {
+      get: function() {
+        return this._isVisible;
+      },
+      set: function(value) {
+        this._isVisible = value;
+        // Update 'visible' aray of the buffer
+        var visibility = this.buffer.getAttribute('visible');
+        for (var i=0; i<this.length; ++i) {
+          visibility[this.start + i] = value ? 1.0 : 0;
+        }
+      }
+    });
+  };
+
+  WebGLApplication.BufferObjectFactory.prototype.create = function(start) {
+    return new this.BufferObject(start);
   };
 
   /**
