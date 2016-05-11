@@ -4884,6 +4884,7 @@
     // Merge mesh of all synaptic spheres
     if (mergedConnectorsGeometry) {
       var bg = new THREE.BufferGeometry();
+      bg.computeVertexNormals();
       bg.fromGeometry(mergedConnectorsGeometry);
       this.synapticSphereCollection= new THREE.Mesh(bg, new THREE.MeshNormalMaterial());
       this.space.add(this.synapticSphereCollection);
@@ -5016,7 +5017,7 @@
 
           'void main() {',
           '  if (vVisible > 0.0) {',
-          '    gl_FragColor = vec4(vColor, alpha);',
+          '    gl_FragColor = vec4(vColor, 1.0);',
           '  } else {',
           '    discard;',
           '  }',
@@ -5025,7 +5026,7 @@
         side: THREE.DoubleSide,
         depthTest: true,
         depthWrite: false,
-        transparent: true,
+        transparent: false,
       });
 
       this.specialTagSphereCollection = new THREE.Mesh(labelGeometry, labelMaterial);
