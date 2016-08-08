@@ -61,6 +61,11 @@ urlpatterns += [
     url(r'^log/(?P<level>(info|error|debug))$', log.log_frontent_event),
 ]
 
+# Transactions and history
+urlpatterns += [
+    url(r'^(?P<project_id>\d+)/transactions/$', transaction.volume_collection),
+]
+
 # Messages
 urlpatterns += [
     url(r'^messages/list$', message.list_messages),

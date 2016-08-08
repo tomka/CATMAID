@@ -90,6 +90,12 @@
         // History table
         tabs['History'].dataset.mode = 'history';
 
+        var updateHistory = document.createElement('input');
+        updateHistory.setAttribute("type", "button");
+        updateHistory.setAttribute("value", "Update history table");
+        updateHistory.onclick = this.update.bind(this);
+        tabs['History'].appendChild(updateHistory);
+
         var self = this;
         $(controls).tabs({
           activate: function(event, ui) {
@@ -106,9 +112,9 @@
       contentID: "log_table_content",
       createContent: function(container) {
         var self = this;
-        this.logContainer = document.createElement('div');
-        this.historyContainer = document.createElement('div');
 
+        // Log table content
+        this.logContainer = document.createElement('div');
         var logTable = document.createElement('table');
         logTable.setAttribute('id', 'logtable');
 
@@ -234,6 +240,27 @@
             var z = parseFloat(aData[5]);
             project.moveTo(z, y, x);
         });
+
+        // History content
+        this.historyContainer = document.createElement('div');
+        var historyTable = document.createElement('table');
+        this.historyTable = $(historyTable).DataTable({
+          lengthMenu: [CATMAID.pageLengthOptions, CATMAID.pageLengthLabels],
+          ajax: {
+            url: CATMAID.makeURL(project.id +  "/transactions/"),
+            dataSrc: ""
+          },
+          columns: [
+            {data: "name"},
+            {data: "comment"},
+            {data: "user"},
+            {data: "creation_time"},
+            {data: "editor"},
+            {data: "edition_time"}
+          ],
+        });
+        this.historyContainer.appendChild(historyTable);
+        container.appendChild(this.historyContainer);
       }
     };
   };
