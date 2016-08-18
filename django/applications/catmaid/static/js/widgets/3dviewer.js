@@ -4807,116 +4807,48 @@
    */
   WebGLApplication.prototype.Space.prototype.Skeleton.prototype.createLabelSpheres =
       function(labels, scaling) {
-    var labelGeometry = new THREE.BufferGeometry();
-    var labelTemplateGeometry = this.space.staticContent.labelspheregeometry;
-    var nPointsPerLabel = labelTemplateGeometry.vertices.length;
-    var facesOfLabel = labelTemplateGeometry.faces;
-    var nFacesPerLabel = facesOfLabel.length;
-    var boFactory = new CATMAID.BufferObjectFactory(labelGeometry, nPointsPerLabel);
 
-    var indexCount     = labels.length * nFacesPerLabel * 3;
-    var IndexType      = indexCount > 65535 ? Uint32Array : Uint16Array;
-    var labelIndices   = new IndexType(indexCount);
+    var geometry = new CATMAID.MultiObjectBufferGeometry({
+      templateGeometry: this.space.staticContent.labelspheregeometry,
+      nObjects: labels.length,
+    });
+    var boFactory = geometry.createObjectFactory();
 
-    var labelPositions = new Float32Array(labels.length * nPointsPerLabel * 3);
-    var labelNormals   = new Float32Array(labels.length * nPointsPerLabel * 3);
-    var labelColors    = new Float32Array(labels.length * nPointsPerLabel * 3);
-    var labelVisible   = new Float32Array(labels.length * nPointsPerLabel);
-    var labelAlphas    = new Float32Array(labels.length * nPointsPerLabel);
+    boFactory.createAll(labels, scaling, (function(v, m) {
+      return !this.specialTagSpheres.hasOwnProperty(v.node_id);
+    }).bind(this), (function(v, m, bufferObject) {
+      this.specialTagSpheres[v.node_id] = bufferObject;
+    }).bind(this));
 
-    // Find radius
-    var tmp = new THREE.Vector3();
-    var radius = labelTemplateGeometry.boundingSphere.radius * scaling;
+    var material = new CATMAID.FlexibleShaderLambertMaterial();
 
-    // Create actual label geometry data based on the static label sphere
-    // geometry instance.
-    var labelMesh = new THREE.Mesh(labelTemplateGeometry);
-    var labelVertex = new THREE.Vector3();
-    var labelNormal = new THREE.Vector3();
-    for (var li=0, max=labels.length; li<max; ++li) {
-      var label = labels[li];
-      var v = label[0];
-      if (this.specialTagSpheres.hasOwnProperty(v.node_id)) {
-        // There already is a tag sphere at the node
-        continue;
-      }
-      var labelColor = label[1].color;
-      var labelAlpha = label[1].opacity;
-
-      labelMesh.position.set(v.x, v.y, v.z);
-      CATMAID.tools.setXYZ(labelMesh.scale, scaling);
-      labelMesh.updateMatrix();
-      var matrix = labelMesh.matrix;
-
-      var pointStart = li * nPointsPerLabel;
-      var vertexStart = pointStart * 3;
-      for (var j=0; j<nPointsPerLabel; ++j) {
-        labelVertex.copy(labelTemplateGeometry.vertices[j]);
-        labelVertex.applyMatrix4(matrix);
-
-        var vIndex =  vertexStart + j * 3;
-        labelPositions[vIndex + 0] = labelVertex.x;
-        labelPositions[vIndex + 1] = labelVertex.y;
-        labelPositions[vIndex + 2] = labelVertex.z;
-
-        labelColors[vIndex + 0] = labelColor.r;
-        labelColors[vIndex + 1] = labelColor.g;
-        labelColors[vIndex + 2] = labelColor.b;
-
-        labelVisible[pointStart + j] = 1.0;
-        labelAlphas[pointStart + j] = labelAlpha;
-      }
-
-      var faceStart = li * nFacesPerLabel * 3;
-      for (var j=0; j<nFacesPerLabel; ++j) {
-        var face = facesOfLabel[j];
-        var offset = faceStart + j * 3;
-        var a, b, c;
-        labelIndices[offset + 0] = a = pointStart + face.a;
-        labelIndices[offset + 1] = b = pointStart + face.b;
-        labelIndices[offset + 2] = c = pointStart + face.c;
-
-        var vertexNormals = face.vertexNormals;
-        a *= 3;
-        labelNormals[a + 0] = vertexNormals[0].x;
-        labelNormals[a + 1] = vertexNormals[0].y;
-        labelNormals[a + 2] = vertexNormals[0].z;
-        b *= 3;
-        labelNormals[b + 0] = vertexNormals[1].x;
-        labelNormals[b + 1] = vertexNormals[1].y;
-        labelNormals[b + 2] = vertexNormals[1].z;
-        c *= 3;
-        labelNormals[c + 0] = vertexNormals[2].x;
-        labelNormals[c + 1] = vertexNormals[2].y;
-        labelNormals[c + 2] = vertexNormals[2].z;
-      }
-
-      this.specialTagSpheres[v.node_id] = boFactory.create(pointStart, v.node_id, v,
-          scaling, label[1], radius);
-    }
-
-    // Create buffer geometry
-    labelGeometry.setIndex(new THREE.BufferAttribute(labelIndices, 1));
-    labelGeometry.addAttribute('position', new THREE.BufferAttribute(labelPositions, 3));
-    labelGeometry.addAttribute('normal', new THREE.BufferAttribute(labelNormals, 3));
-    labelGeometry.addAttribute('colorNew', new THREE.BufferAttribute(labelColors, 3));
-    labelGeometry.addAttribute('visibleNew', new THREE.BufferAttribute(labelVisible, 1));
-    labelGeometry.addAttribute('alphaNew', new THREE.BufferAttribute(labelAlphas, 1));
-
-    // Mark position, visible and alpha attributes as dynamic so that they can
-    // be changed during runtime.
-    labelGeometry.attributes.position.setDynamic(true);
-    labelGeometry.attributes.visibleNew.setDynamic(true);
-    labelGeometry.attributes.alphaNew.setDynamic(true);
-    labelGeometry.attributes.colorNew.setDynamic(true);
-
-    labelGeometry.computeBoundingSphere();
-
-    var labelMaterial = new CATMAID.FlexibleShaderLambertMaterial(label[1]);
-
-    this.specialTagSphereCollection = new THREE.Mesh(labelGeometry, labelMaterial);
+    this.specialTagSphereCollection = new THREE.Mesh(geometry, material);
     this.space.add(this.specialTagSphereCollection);
   };
+
+  /* The itype is 0 (pre) or 1 (post), and chooses from the two arrays: synapticTypes and synapticColors. */
+  WebGLApplication.prototype.Space.prototype.Skeleton.prototype.createConnectorSpheres = function(nodes, scaling) {
+
+    var geometry = new CATMAID.BufferGeometry({
+      templateGeometry: this.space.staticContent.nodespheregeometry,
+    });
+    var boFactory = new CATMAID.BufferObjectFactory(bufferGeometry, nPointsPerLabel);
+
+    function singleSphere(v, itype, scaling) {
+      if (this.synapticSpheres.hasOwnProperty(v.node_id)) {
+        // There already is a synaptic sphere at the node
+        return;
+      }
+      var mesh = new THREE.Mesh( this.space.staticContent.radiusSphere, this.synapticColors[itype] );
+      mesh.position.set( v.x, v.y, v.z );
+      mesh.node_id = v.node_id;
+      mesh.type = this.synapticTypes[itype];
+      CATMAID.tools.setXYZ(mesh.scale, scaling);
+      this.synapticSpheres[v.node_id] = mesh;
+      this.space.add( mesh );
+    }
+  };
+
 
   WebGLApplication.prototype.Space.prototype.Skeleton.prototype.createEdge = function(v1, v2, type) {
     // Create edge between child (id1) and parent (id2) nodes:
@@ -4965,22 +4897,6 @@
     this.space.add(mesh);
   };
 
-  /* The itype is 0 (pre) or 1 (post), and chooses from the two arrays: synapticTypes and synapticColors. */
-  WebGLApplication.prototype.Space.prototype.Skeleton.prototype.createSynapticSphere = function(v, itype, scaling) {
-    if (this.synapticSpheres.hasOwnProperty(v.node_id)) {
-      // There already is a synaptic sphere at the node
-      return;
-    }
-    var mesh = new THREE.Mesh( this.space.staticContent.radiusSphere, this.synapticColors[itype] );
-    mesh.position.set( v.x, v.y, v.z );
-    mesh.node_id = v.node_id;
-    mesh.type = this.synapticTypes[itype];
-    CATMAID.tools.setXYZ(mesh.scale, scaling);
-    this.synapticSpheres[v.node_id] = mesh;
-    this.space.add( mesh );
-  };
-
-
   WebGLApplication.prototype.Space.prototype.Skeleton.prototype.reinit_actor = function(skeletonmodel, json, options) {
     if (this.actor) {
       this.destroy();
@@ -4989,7 +4905,7 @@
     this.initialize_objects(options);
 
     var nodes = json[0];
-    var connectors = json[1];
+    var raw_connectors = json[1];
     var tags = json[2];
 
     var lean = options.lean_mode;
@@ -5013,7 +4929,8 @@
     material.opacity = this.skeletonmodel.opacity;
     material.transparent = material.opacity !== 1;
 
-    // Collect all labels first, before creating its geometry
+    // Collect connectors and labels first, before creating its geometry
+    var connector_nodes = new Array(raw_connectors.length);
     var labels = [];
 
     // Create edges between all skeleton nodes
@@ -5100,7 +5017,7 @@
     // Create edges between all connector nodes and their associated skeleton nodes,
     // appropriately colored as pre- or postsynaptic.
     // If not yet there, create as well the sphere for the node related to the connector
-    connectors.forEach(function(con) {
+    raw_connectors.forEach(function(con, i) {
       // con[0]: treenode ID
       // con[1]: connector ID
       // con[2]: 0 for pre, 1 for post, 2 for gap junction, -1 for other to be skipped
@@ -5111,7 +5028,7 @@
       v1.node_id = con[1];
       var v2 = vs[con[0]];
       this.createEdge(v1, v2, this.synapticTypes[con[2]]);
-      this.createSynapticSphere(v2, con[2], options.skeleton_node_scaling);
+      connector_nodes[i] =[v2, con[2], options.skeleton_node_scaling];
     }, this);
 
     // Place spheres on nodes with special labels, if they don't have a sphere there already
@@ -5144,6 +5061,10 @@
     // Create label geometry, if needed
     if (labels.length > 0) {
       this.createLabelSpheres(labels, options.skeleton_node_scaling);
+    }
+
+    if (connector_nodes.length > 0) {
+      //this.createConnectorSpheres(connector_nodes, options.skeleton_node_scaling);
     }
 
     if (options.resample_skeletons) {
