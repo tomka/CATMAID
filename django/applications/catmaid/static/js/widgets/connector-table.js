@@ -171,27 +171,25 @@
               .catch(CATMAID.handleError);
           },
           columns: [
-            {data: 0, className: "cm-center", title: "Connector"},
-            {data: 1, className: "cm-center", title: "Skeleton ID"},
-            {data: 2, className: "cm-center", title: "X"},
-            {data: 3, className: "cm-center", title: "Y"},
-            {data: 4, className: "cm-center", title: "Z"},
+            {data: 'links[0]', className: "cm-center", title: "Skeleton ID"},
+            {data: 'links[1]', className: "cm-center", title: "Connector ID"},
+            {data: 'links[2]', className: "cm-center", title: "X"},
+            {data: 'links[3]', className: "cm-center", title: "Y"},
+            {data: 'links[4]', className: "cm-center", title: "Z"},
             {
-              data: 4,
+              data: 'links[4]',
               title: "S",
               className: "cm-center",
               render: function(data, type, row, meta) {
                 return project.focusedStackViewer.primaryStack.projectToStackZ(row[4], row[3], row[2]);
               },
             }, // section index
-            {data: 5, className: "cm-center", title: "Source confidence"},
-            {data: 6, className: "cm-center", title: "Partner confidence"},
-            {data: 7, className: "cm-center", title: "Tags"},
-            {data: 8, className: "cm-center", title: "# Skeleton nodes"},
-            {data: 9, className: "cm-center", title: "User"},
-            {data: 10, className: "cm-center", title: "Treenode ID"},
+            {data: 'links[5]', className: "cm-center", title: "Link confidence"},
+            {className: "cm-center", title: "Tags", render: function() {}},
+            {data: 'links[6]', className: "cm-center", title: "User"},
+            {data: 'links[7]', className: "cm-center", title: "Treenode ID"},
             {
-              data: 11,
+              data: 'links[8]',
               title: "Last modified",
               className: "catmaid.center",
               render: function(data, type, row, meta) {
