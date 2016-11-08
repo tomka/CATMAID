@@ -7,17 +7,23 @@
 
   var ClassificationEditor = new function()
   {
+    this.widgetID = this.registerInstance();
+
     var self = this;
     var content_div_id = 'classification_editor_widget';
     var display_superclass_names = false;
     var display_previews = true;
     var display_edit_tools = true;
+    var project_id = project.id;
     var workspace_pid;
     var bboxtool = new CATMAID.BoxSelectionTool();
     // Offsets for the image preview when hovering a
     // ROI indication icon.
     var preview_x_offset = 0;
     var preview_y_offset = 30;
+
+    // The currently selected graph
+    var currentRootLink = null;
 
     /**
      * Initialization of the window.
@@ -43,19 +49,29 @@
     };
 
     /**
-     * Replace current content with a classification setup form.
+     * Get widget container and optionally empty it.
      */
-    this.show_setup_message = function(project_id, workspace_id) {
+    var getContainer = function(empty) {
       var container = document.getElementById(content_div_id);
       if (!container) {
         throw new CATMAID.Error("Could not find widget container");
       }
 
       // Empty container
-      while (container.lastChild) {
-        container.removeChild(container.lastChild);
+      if (empty) {
+        while (container.lastChild) {
+          container.removeChild(container.lastChild);
+        }
       }
 
+      return container;
+    };
+
+    /**
+     * Replace current content with a classification setup form.
+     */
+    this.show_setup_message = function(project_id, workspace_id) {
+      var container = getContainer();
       var p1 = document.createElement('p');
       p1.appendChild(document.createTextNode("The classification system " +
           "doesn't seem to be set-up to work with this project. It needs " +
@@ -99,23 +115,94 @@
     };
 
     /**
-     * Load the classification data.
+     * Display options to create a new graph.
      */
-    this.load_classification = function(pid, completionCallback) {
-      CATMAID.fetch(pid + '/classification/' + self.workspace_pid + '/show', 'GET')
-        .then(function(e) {
-          var container = document.getElementById(content_div_id);
-          container.innerHTML = e.content;
-          self.handleContent( e.page, container, pid );
-          // execute callback if available
-          if (completionCallback)
-            completionCallback();
-        })
-        .catch(function(error) {
-          if ("ClassificationSetupError" === error.type) {
-            self.show_setup_message(pid, self.workspace_pid);
+    this.show_new_graph_form = function(existingRoots) {
+      var container = getContainer();
+
+      // Don't attemt to find root classes, if user has no permission
+      if (!CATMAID.hasPermission(workspace_id, 'can_annotate')) {
+        var p = document.createElement('p');
+        p.appendChild(document.createTextNode("Unfortunately, you don't " +
+            "have permission to create new annotation graphs for the current " +
+            "workspace."));
+        container.appendChild(p);
+        return;
+      }
+
+      // Request classification root classes
+      CATMAID.fetch(workspace_pid + '/ontology/roots/')
+        .then(function(json) {
+          if (0 === json.root_classes.length) {
+            container.innerHTML = "<p>There are currently no valid " +
+                "classification ontologies available.<p>" +
+                " <p>Please create at least one classification ontology " +
+                "(e.g. with the help of the ontology editor) to start a " +
+                "new classification graph. A class is seen as the root node " +
+                "of a classification ontology if it is linked to the " +
+                "<em>classification_root</em> class with an <em>is_a</em> " +
+                "relation.</p>";
           } else {
-            CATMAID.handleError(error);
+            if (0 === nExistingRoots) {
+              var p = document.createElement('p');
+              p.appendChild(document.createTextNode("There is currently no " +
+                  "classification graph associated with this project. Feel " +
+                  "free to create a new one."));
+              container.appendChild(p);
+            }
+
+            var p1 = document.createElement('p');
+            p1.appendChild(document.createTextNode("To create a new " +
+                "classification graph, please select an ontology that you " +
+                "would like the new graph to be based on and click on " +
+                "\"Create\"."))
+
+            var p2 = document.createElement('p');
+            var ontologySelect = document.createElement('select');
+            json.root_classes.forEach(function(rc) {
+              var option = new Option(rc.name, rc.id);
+              this.add(option);
+            }, ontologySelect);
+            var $ontologySelectLabel = CATMAID.DOM.createLabeledControl("Ontology",
+                ontologySelect, "Select the ontology the new graph is based on");
+            $(p2).append($ontologySelectLabel);
+
+            var createButton = document.createElement('input');
+            createButton.setAttribute('type', 'createButton');
+            createButton.setAttribute('value', 'Create');
+            createButton.onclick = function() {
+              var ontologyId = ontologySelect.value;
+              if (!ontologyId) {
+                CATMAID.warn('Please select ontolgy first');
+                return;
+              }
+              CATMAID.fetch(project_id + '/classification/' + workspace_pid + '/new',
+                  'POST', {
+                    ontology_id: ontologyId
+                  })
+                .then(function(json) {
+                  CATMAID.msg('Success', 'A new classification graph was created');
+                })
+                .catch(CATMAID.handleError);
+            };
+
+            p2.appendChild(createButton);
+
+
+
+            var p3 = document.createElement('p'); 
+            p3.appendChild(document.createTextNode("Alternatively, you can " +
+                "link an existing classification graph to this project. If " +
+                "you want to do so, please select the tree below and click " +
+                "\"Link\"."));
+            var p4 = document.createElement('p');
+            
+            container.appendChild(p1);
+            container.appendChild(p2);
+            container.appendChild(p3);
+            container.appendChild(p4);
+
+            // Request 
           }
         });
     };
@@ -952,10 +1039,56 @@
       }
     };
 
+    /**
+     * Refresh user interface based on current state. If a particular
+     * classification graph is selected, this graph is updated. Otherwise, if no
+     * graph is available, the user is provided an option to create a new one.
+     * If a single graph is available, this graph is shown and if multiple
+     * graphs are available options to select a graph are provided.
+     */
     this.refresh = function(completionCallback)
     {
-      if (project)
-        self.load_classification(project.id, completionCallback);
+      if (!project) {
+        return;
+      }
+
+      if (currentRootLink) {
+        CATMAID.warn('TBD');
+      } else {
+        // Get all root classes
+        CATMAID.fetch(pid + '/classification/' + self.workspace_pid + '/roots/')
+          .then(function(json) {
+            var nRoots = json.root_instances.length;
+            if (0 === nRoots) {
+              // Show "New Graph" view
+              self.show_new_graph_form(nRoots);
+            } else if (1 === nRoots) {
+              // Show the one available graph
+              CATMAID.warn('TBD 2');
+            } else {
+              // Show option to select a graph
+              CATMAID.warn('TBD 3');
+            }
+          })
+          .catch(CATMAID.handleError);
+      }
+
+      CATMAID.fetch(pid + '/classification/' + self.workspace_pid + '/show', 'GET')
+        .then(function(e) {
+          var container = document.getElementById(content_div_id);
+          container.innerHTML = e.content;
+          self.handleContent( e.page, container, pid );
+          // execute callback if available
+          if (completionCallback)
+            completionCallback();
+        })
+        .catch(function(error) {
+          if ("ClassificationSetupError" === error.type) {
+            self.show_setup_message(pid, self.workspace_pid);
+          } else {
+            CATMAID.handleError(error);
+          }
+        });
     };
 
     /**
@@ -966,7 +1099,17 @@
         delaytime = 2500;
       CATMAID.msg(title, message, {duration: delaytime});
     };
-  }();
+  };
+
+  $.extend(ConnectivityMatrixWidget.prototype, new InstanceRegistry());
+
+  ClassificationEditor.prototype.getName = function() {
+    return "Classification Editor " + this.widgetId;
+  };
+
+  ClassificationEditor.prototype.destroy = function() {
+    this.unregisterInstance();
+  };
 
   // Export classification editor into CATMAID namespace
   CATMAID.ClassificationEditor = ClassificationEditor;

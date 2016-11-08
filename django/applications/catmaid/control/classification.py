@@ -104,6 +104,22 @@ class ClassInstanceClassInstanceProxy(ClassInstanceClassInstance):
 
         return result
 
+def get_classification_roots(request, project_id, workspace_pid):
+    """ Returns a list of classification graph roots, linked to a
+    project. The classification system uses a dummy project with ID -1
+    to store its ontologies and class instances. Each project using a
+    particular classification graph instance creates a class instance
+    with its PID of class classification_project (which lives in dummy
+    project -1). Those class instances will be returned.
+    """
+    # Get all links
+    cursor = connection.cursor()
+    links_q = get_classification_links_qs(workspace_pid, project_id, cursor)
+    # Retrieve IDs
+    return JsonResponse({
+        'root_instances': links_q.values_list('class_instance_b', flat=True)
+    })
+
 def get_root_classes_count(workspace_pid):
     """ Return the number of available root classes for the given workspace
     project.
@@ -174,10 +190,6 @@ def get_classification_links_qs( workspace_pid, project_ids, inverse=False,
     root_class_instances = ClassInstance.objects.filter(project_id=workspace_pid,
         class_column_id__in=root_class_ids)
 
-    # Query to get the 'classified_by' relation
-    classified_by_rel = Relation.objects.filter(project_id=workspace_pid,
-        relation_name='classified_by')
-
     # Find all 'classification_project' class instances of all requested
     # projects that link to those root nodes
     cici_q = ClassInstanceClassInstance.objects.filter(project_id=workspace_pid,
@@ -187,18 +199,11 @@ def get_classification_links_qs( workspace_pid, project_ids, inverse=False,
 
     return cici_q
 
-def get_classification_roots( workspace_pid, project_id, cursor=None ):
-    """ Returns a list of classification graph roots, linked to a
-    project. The classification system uses a dummy project with ID -1
-    to store its ontologies and class instances. Each project using a
-    particular classification graph instance creates a class instance
-    with its PID of class classification_project (which lives in dummy
-    project -1). Those class instances will be returned.
+def get_classification_roots_view(request, workspace_pid, project_id, cursor=None):
     """
-    # Get all links
+    """
     links_q = get_classification_links_qs( workspace_pid, project_id, cursor )
-    # Return valid roots
-    return [ cici.class_instance_a for cici in links_q ]
+
 
 def get_classification_number( project_id ):
     """ Returns the number of classification graphs, linked to a
@@ -471,39 +476,23 @@ def show_classification_editor( request, workspace_pid=None, project_id=None, li
         'page': page_type,
         'link': link_id}))
 
-@requires_user_role([UserRole.Annotate, UserRole.Browse])
+@requires_user_role([UserRole.Annotate])
 def add_classification_graph(request, workspace_pid=None, project_id=None):
     workspace_pid = int(workspace_pid)
     project_id = int(project_id)
     project = get_object_or_404(Project, pk=project_id)
-    # Has the form been submitted?
-    new_graph_form_class = create_new_graph_form(workspace_pid)
-    if request.method == 'POST':
-        new_graph_form = new_graph_form_class(request.POST)
-        if new_graph_form.is_valid():
-            # Create the new classification graph
-            ontology = new_graph_form.cleaned_data['ontology']
-            ontology_root_ci = init_new_classification( workspace_pid,
-                request.user, ontology )
-            # Link this graph instance to the project
-            link_existing_classification( workspace_pid, request.user,
-                project, ontology_root_ci )
-            return HttpResponse('A new graph has been initialized.')
-    else:
-        new_graph_form = new_graph_form_class()
+    ontology_id = request.POST.get('ontology_id', None)
+    if not ontology_id:
+        raise ValueError("Ontology ID required")
 
-    workspace = get_object_or_404(Project, pk=workspace_pid)
-    link_form = create_linked_graphs_form( workspace.id, project.id )
-    link_graph_form = link_form()
-    num_root_classes = get_root_classes_count(workspace_pid)
-
-    return render(request, "catmaid/classification/new_graph.html", {
-        'project': project,
-        'workspace': workspace,
-        'new_graph_form': new_graph_form,
-        'link_graph_form': link_graph_form,
-        'num_root_classes': num_root_classes,
-        'CATMAID_URL': settings.CATMAID_URL
+    # Create the new classification graph
+    ontology_root_ci = init_new_classification(workspace_pid,
+        request.user, ontology_id)
+    # Link this graph instance to the project
+    link_existing_classification(workspace_pid, request.user,
+        project, ontology_root_ci)
+    return JsonResponse({
+        'success': 'A new graph has been initialized.'
     })
 
 @requires_user_role([UserRole.Annotate, UserRole.Browse])
