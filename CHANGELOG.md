@@ -68,6 +68,7 @@ Miscellaneous:
   information for the query time range. This fixes some time zone conversion
   corner cases.
 
+- Graph widget: SVG export works again.
 
 ## 2016.12.16
 
