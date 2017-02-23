@@ -46,9 +46,11 @@ needed_sampler_interval_states = {
     'completed': 'The interval has been completed'
 }
 needed_sampler_domain_types = {
+    'regular':  'A general explicitly defined domain',
     'backbone': 'The backbone of a neuron',
-    'twig':     'A small distal fragment',
-    'bounton':  'A particular type of morphology'
+    'bouton':   'A particular type of morphology',
+    'covering': 'Complete neuron',
+    'twig':     'A small distal fragment'
 }
 
 
