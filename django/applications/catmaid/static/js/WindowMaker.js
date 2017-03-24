@@ -182,6 +182,9 @@ var WindowMaker = new function()
     config.createContent.call(instance, content);
     container.appendChild(content);
 
+    // Add access to window settings
+    DOM.addWindowConfigButton(win);
+
     // Register to events
     var destroy = instance.destroy ? instance.destroy.bind(instance) : undefined;
     var resize = instance.resize ? instance.resize.bind(instance) : undefined;
