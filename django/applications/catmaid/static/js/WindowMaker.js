@@ -378,6 +378,7 @@ var WindowMaker = new function()
      ['own-reviewed', 'Own Reviewed'],
      ['last-reviewed', 'Last Reviewer'],
      ['axon-and-dendrite', 'Axon and dendrite'],
+     ['sampler-domains', 'Reconstrucion sampler domains']
     ].forEach(function(e) {
        colorMenu.options.add(new Option(e[1], e[0]));
     });
