@@ -890,7 +890,7 @@ var WindowMaker = new function()
     // the execution of the RESIZE handler before the canvas is
     // initialized.
     addLogic(win);
-    WA.init( 800, 600, canvas.getAttribute("id") );
+    WA.init( 800, 600, canvas );
 
     // Since the initialization can potentially change the node scaling, the is
     // updated here explicitly. At some point we might want to have some sort of

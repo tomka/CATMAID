@@ -56,12 +56,11 @@
 
   $.extend(WebGLApplication.prototype, new InstanceRegistry());
 
-  WebGLApplication.prototype.init = function(canvasWidth, canvasHeight, divID) {
+  WebGLApplication.prototype.init = function(canvasWidth, canvasHeight, container) {
     if (this.initialized) {
       return;
     }
-    this.divID = divID;
-    this.container = document.getElementById(divID);
+    this.container = container;
     this.submit = new submitterFn();
     this.options = new WebGLApplication.prototype.OPTIONS.clone();
     this.space = new this.Space(canvasWidth, canvasHeight, this.container, project.focusedStackViewer.primaryStack, this.options);
