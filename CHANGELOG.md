@@ -37,6 +37,9 @@ Miscellaneous:
   after the name in the window title bar. A small window-like icon next to the
   window name toggles controls to change the widget alias.
 
+- Split/Merge dialog: the node count for both respecivly remaining/new and
+  remaining/old are now on top of the annotation lists.
+
 
 ### Bug fixes
 
