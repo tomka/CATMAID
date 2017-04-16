@@ -993,6 +993,7 @@ class SamplerState(models.Model):
 @python_2_unicode_compatible
 class Sampler(UserFocusedModel):
     interval_length = models.FloatField()
+    review_required = models.BooleanField(default=True)
     sampler_state = models.ForeignKey(SamplerState, on_delete=models.CASCADE)
     skeleton = models.ForeignKey(ClassInstance, db_index=True, on_delete=models.CASCADE)
 
@@ -1017,6 +1018,25 @@ class SamplerInterval(UserFocusedModel):
             related_name="sampler_interval_start_node_set")
     end_node = models.ForeignKey(Treenode, on_delete=models.CASCADE,
             related_name="sampler_interval_end_node_set")
+
+    def __str__(self):
+        return "({}, {})".format(self.start_node_id, self.end_node_id)
+
+
+@python_2_unicode_compatible
+class SamplerConnectorState(models.Model):
+    name = models.TextField()
+    description = models.TextField()
+
+    def __str__(self):
+        return self.name
+
+
+@python_2_unicode_compatible
+class SamplerConnector(UserFocusedModel):
+    interval = models.ForeignKey('SamplerInterval', db_index=True, on_delete=models.CASCADE)
+    connector = models.ForeignKey('Connector', db_index=True, on_delete=models.CASCADE)
+    connector_state = models.ForeignKey(SamplerConnectorState, db_index=True, on_delete=models.CASCADE)
 
     def __str__(self):
         return "({}, {})".format(self.start_node_id, self.end_node_id)

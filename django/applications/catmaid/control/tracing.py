@@ -10,7 +10,7 @@ from catmaid.apps import get_system_user
 from catmaid.control.authentication import requires_user_role
 from catmaid.control.common import get_class_to_id_map, get_relation_to_id_map
 from catmaid.models import (Class, ClassInstance, Relation, SamplerDomainType,
-        SamplerIntervalState, SamplerState, UserRole)
+        SamplerIntervalState, SamplerState, SamplerConnectorState, UserRole)
 
 
 # All classes needed by the tracing system alongside their
@@ -51,6 +51,12 @@ needed_sampler_domain_types = {
     'bouton':   'A particular type of morphology',
     'covering': 'Complete neuron',
     'twig':     'A small distal fragment'
+}
+needed_sampler_connector_states = {
+    'untouched': 'A new connector, which has not been sampled so far',
+    'started':   'The connector can be sampled',
+    'completed': 'The connector has been completed and shouldn\'t be used for sampling',
+    'excluded':  'The connector is excluded from sampling'
 }
 
 
@@ -163,6 +169,10 @@ def setup_tracing(project_id, user=None):
     # Add missing sampler domain types
     for sn, sd in six.iteritems(needed_sampler_domain_types):
         SamplerDomainType.objects.get_or_create(
+            name=sn, defaults={'description': sd})
+    # Add missing sampler connector states
+    for sn, sd in six.iteritems(needed_sampler_connector_states):
+        SamplerConnectorState.objects.get_or_create(
             name=sn, defaults={'description': sd})
 
     # Add root class instance
