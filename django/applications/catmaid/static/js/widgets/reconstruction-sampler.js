@@ -363,7 +363,7 @@
         },
         {
           data: "state",
-          title: " State",
+          title: "State",
           orderable: true,
           render: function(data, type, row, meta) {
             var state = self.possibleStates[row.state_id];
@@ -1026,7 +1026,7 @@
         },
         {
           data: "state_id",
-          title: " State",
+          title: "State",
           orderable: true,
           render: function(data, type, row, meta) {
             var state = self.possibleStates[row.state_id];
@@ -1114,55 +1114,88 @@
     prepare
       .then(getDomainDetails.bind(this, project.id, domain.id))
       .then(function(domainDetails) {
-        // Get domain arbor, which is then split into slabs, which are then
-        // further split into intervals of respective length.
-        var domainArbor = CATMAID.Sampling.domainArborFromModel(arbor.arbor, domainDetails);
-
-        // Create Intervals from partitions
-        var intervals = [], positions = arbor.positions;
-        var partitions = domainArbor.partitionSorted();
-        for (var i=0; i<partitions.length; ++i) {
-          var partition = partitions[i];
-          // Walk partition toward leafs
-          var sum = 0;
-          var intervalStartIdx = partition.length - 1;
-          var intervalStartPos = positions[partition[intervalStartIdx]];
-          // Traverse towards leafs, i.e. from the end of the partition entries
-          // to branch points or root.
-          for (var j=partition.length - 2; j>=0; --j) {
-            var oldSum = sum;
-            // Calculate new interval length
-            var pos = positions[partition[j]];
-            var dist = intervalStartPos.distanceTo(pos);
-            sum += dist;
-            //  If sum is greater than interval length, create new interval. If
-            //  <preferSmalError>, the end/start node is either the current one
-            //  or the last one, whichever is closer to the ideal length.
-            //  Otherwise this node is used.
-            if (sum > intervalLength) {
-              var steps = intervalStartIdx - j;
-              // Optionally, make the interval smaller if this means being
-              // closer to the ideal interval length. This can only be done if
-              // the current interval has at least a length of 2.
-              if (preferSmallerError && (intervalLength - oldSum) < dist && steps > 1 && j !== 0) {
-                intervals.push([partition[intervalStartIdx], partition[j+1]]);
-                intervalStartIdx = j + 1;
-              } else {
-                intervals.push([partition[intervalStartIdx], partition[j]]);
-                intervalStartIdx = j;
-              }
-              sum = 0;
-            }
-          }
-        }
-
-        return intervals;
+        return CATMAID.Sampling.intervalsFromModels(arbor.arbor || arbor, //TODO: Remove the || arbor, needed after domain creation
+            arbor.positions, domainDetails, intervalLength,
+            preferSmallerError);
       })
       .then(function(intervals) {
-        return CATMAID.fetch(project.id + '/samplers/domains/' +
-            domain.id + '/intervals/add-all', 'POST', {
-                intervals: intervals
+        return new Promise(function(resolve, reject) {
+          // Show 3D viewer confirmation dialog
+          var dialog = new CATMAID.Confirmation3dDialog({
+            title: "Please confirm " + intervals.length + " domain interval(s)",
+            showControlPanel: false
+          });
+
+          // Create intervals if OK is pressed
+          dialog.onOK = function() {
+            CATMAID.fetch(project.id + '/samplers/domains/' +
+                domain.id + '/intervals/add-all', 'POST', {
+                    intervals: intervals
+                })
+              .then(function(result) {
+                CATMAID.msg("Success", intervals.length + " interval(s) created");
+                resolve(result);
+              })
+              .catch(reject);
+          };
+          dialog.onCancel = function() {
+            CATMAID.msg("No intervals created", "Canceled by user");
+          };
+
+          dialog.show();
+
+          // At the moment the 3D viewer is only accessible after display
+          var widget = dialog.webglapp;
+          var models = {};
+          models[skeletonId] = new CATMAID.SkeletonModel(skeletonId);
+          widget.addSkeletons(models, function() {
+
+            var makeEndNode = function(nodeId) {
+              return {
+                id: null,
+                node_id: parseInt(nodeId, 10)
+              };
+            };
+
+            /*
+
+            // The defined domains are noy yet available from the back-end,
+            // prepopulate the skeleton's sampler property with fake data that
+            // showing the domains to be created.
+            var skeletons = widget.space.content.skeletons;
+            var fakeDomainId = 0;
+            var previewDomains = domains.map(function(d) {
+              return {
+                ends : d.endNodeIds.map(makeEndNode),
+                id: fakeDomainId++, // use fake ID, needed for different colors
+                start_node_id: d.startNodeId, // needed
+                // parent_interval: null,
+                // project_id: project.id,
+                // sampler_id: null,
+              };
             });
+            for (var skeletonId in skeletons) {
+              var skeleton = skeletons[skeletonId];
+              skeleton.setSamplers([{
+                id: null,
+                domains: previewDomains,
+                // creation_time,
+                // edition_time,
+                // interval_length,
+                // skeleton_id,
+                // state_id,
+                // user_ud
+              }]);
+            }
+
+            */
+
+            // Set new shading and coloring methods
+            widget.options.color_method = 'sampler-domains';
+            widget.options.shading_method = 'sampler-domains';
+            widget.updateSkeletonColors();
+          });
+        });
       })
       .then(function(result) {
         widget.update();
@@ -1515,6 +1548,9 @@
    */
   var SynapseWorkflowStep = function() {
     CATMAID.WorkflowStep.call(this, "Synapse");
+    this.sampleInputConnectors = true;
+    this.sampleOutputConnectors = true;
+    this.connectorData = {};
   };
 
   SynapseWorkflowStep.prototype = Object.create(CATMAID.WorkflowStep);
@@ -1525,7 +1561,35 @@
   };
 
   SynapseWorkflowStep.prototype.createControls = function(widget) {
-    return [];
+    var self = this;
+    return [
+      {
+        type: 'checkbox',
+        label: 'Input syanpses',
+        title: 'Consider synapses that are pre-synaptic to this interval for sampling',
+        value: this.sampleInputConnectors,
+        onclick: function() {
+          self.sampleInputConnectors = this.checked;
+        }
+      },
+      {
+        type: 'checkbox',
+        label: 'Ouput syanpses',
+        title: 'Consider synapses that are post-synaptic to this interval for sampling',
+        value: this.sampleOutputConnectors,
+        onclick: function() {
+          self.sampleOutputConnectors = this.checked;
+        }
+      },
+      {
+        type: 'button',
+        label: 'Pick random synapse',
+        title: "Select a random non-abandoned, non-excluded synapse to continue with",
+        onclick: function() {
+          self.pickRandomSynapse(widget);
+        }
+      }
+    ];
   };
 
   SynapseWorkflowStep.prototype.isComplete = function(state) {
@@ -1534,10 +1598,172 @@
 
   SynapseWorkflowStep.prototype.updateContent = function(content, widget) {
     var p = content.appendChild(document.createElement('p'));
-    p.appendChild(document.createTextNode('Reconstruct twig to completion. ' +
+    var msg = (widget.state['reviewRequired'] ? 
+          'Reconstruct interval to completion and have it reviewed. ' :
+          'Reconstruct interval to completion. ') +
         'Create seed nodes for all input synapses; only create one or a few ' +
         'seed nodes for each output synapse. Once this is done, select a ' +
-        '(random) synapse to continue.'));
+        '(random) synapse to continue. Below is a list of connectors in this interval.';
+    p.appendChild(document.createTextNode(msg));
+
+    // Get review information for interval
+
+    var skeletonId = widget.state['skeletonId'];
+
+    // Create a data table with all available domains or a filtered set
+    var inputHeader = content.appendChild(document.createElement('h3'));
+    inputHeader.appendChild(document.createTextNode('Input connectors'));
+    inputHeader.style.clear = 'both';
+    var inputTable = document.createElement('table');
+    content.appendChild(inputTable);
+
+    var outputHeader = content.appendChild(document.createElement('h3'));
+    outputHeader.appendChild(document.createTextNode('Output connectors'));
+    outputHeader.style.clear = 'both';
+    var outputTable = document.createElement('table');
+    content.appendChild(outputTable);
+
+    var self = this;
+    this.ensureMetadata()
+      .then(function() {
+        self.makeConnectorTable(inputTable, skeletonId, "presynaptic_to");
+        self.makeConnectorTable(outputTable, skeletonId, "postsynaptic_to");
+      });
+  };
+
+  SynapseWorkflowStep.prototype.makeConnectorTable = function(table, skeletonId, relation) {
+    var self = this;
+    var datatable = $(table).DataTable({
+      dom: "lrphtip",
+      autoWidth: false,
+      paging: true,
+      lengthMenu: [CATMAID.pageLengthOptions, CATMAID.pageLengthLabels],
+      ajax: function(data, callback, settings) {
+        CATMAID.fetch(project.id + '/connectors/', 'GET', {
+          'skeleton_ids': [skeletonId],
+          'with_tags': 'false',
+          'relation_type': relation
+        })
+        .then(function(result) {
+          var connectorData = result.links.map(function(l) {
+            return {
+              skeleton_id: l[0],
+              id: l[1],
+              x: l[2],
+              y: l[3],
+              z: l[4],
+              confidence: l[5],
+              user_id: l[6],
+              treenode_id: l[7],
+              edition_time: l[8],
+              type: relation
+            };
+          });
+          // Parse data so that it maches the table
+          // Store data in worfklow step
+          self.connectorData[relation] = connectorData;
+
+          callback({
+            draw: data.draw,
+            data: connectorData
+          });
+        })
+        .catch(CATMAID.handleError);
+      },
+      order: [],
+      columns: [
+        {
+          data: "id",
+          title: "Id",
+          orderable: false,
+          render: function(data, type, row, meta) {
+            return row.id;
+          }
+        },
+        {
+          data: "user_id",
+          title: "User",
+          orderable: true,
+          render: function(data, type, row, meta) {
+            return CATMAID.User.safe_get(row.user_id).login;
+          }
+        },
+        {
+          data: "edition_time",
+          title: "Last edited on (UTC)",
+          orderable: true,
+          render: function(data, type, row, meta) {
+            return formatDate(new Date(row.edition_time));
+          }
+        },
+        {
+          data: "treenode_id",
+          title: "Treenode",
+          orderable: true,
+        },
+        {
+          title: "State",
+          orderable: true,
+          render: function(data, type, row, meta) {
+            return "untouched";
+            //var state = self.possibleStates[row.state_id];
+            //return state ? state.name : ("unknown (" + row.state_id + ")");
+          }
+        },
+        {
+          title: "Action",
+          orderable: true,
+          render: function(data, type, row, meta) {
+            return '<a href="#">exclude</a>';
+            //var state = self.possibleStates[row.state_id];
+            //return state ? state.name : ("unknown (" + row.state_id + ")");
+          }
+        }
+      ],
+    });
+  };
+
+  SynapseWorkflowStep.prototype.ensureMetadata = function() {
+    if (this.possibleStates) {
+      return Promise.resolve();
+    } else {
+      var self = this;
+      return CATMAID.fetch(project.id + '/samplers/connectors/states/')
+        .then(function(result) {
+          self.possibleStates = result.reduce(function(o, is) {
+            o[is.id] = is;
+            return o;
+          }, {});
+        });
+    }
+  };
+
+  SynapseWorkflowStep.prototype.pickRandomSynapse = function(widget) {
+    if (!this.connectorData) {
+      CATMAID.warn('Couldn\'t find any connectors');
+      return;
+    }
+
+    // TODO: If review is required, check review first
+    // TODO: Ignore non-excluded, non-abandoned
+    var connectors = [];
+    var incomingConnecots = connectors['presynaptic_to'];
+    if (this.sampleInputConnectors && incomingConnecots) {
+      for (var i=0; i<incomingConnecots.length; ++i) {
+  
+      }
+    }
+
+    if (!intervals || 0 === intervals.length) {
+      CATMAID.warn("No intervals available");
+      return;
+    }
+
+    var skeletonId = widget.state['skeletonId'];
+    // For now, use uniform distribution
+    var interval = intervals[Math.floor(Math.random()*intervals.length)];
+    this.openInterval(interval, widget)
+      .catch(CATMAID.handleError);
   };
 
 

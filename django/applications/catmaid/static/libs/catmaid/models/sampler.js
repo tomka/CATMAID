@@ -49,6 +49,62 @@
   };
 
   /**
+   * Intervals are created by traversing a domain downstream and cutting out
+   * interval parts continuously. This is done by first splitting a domain into
+   * paritions, i.e downstream paths from root or branchpoints to leaves, in
+   * order of decreasing length. cutting out individual intervals.
+   * Partions are paths from root or branch points to leaves.
+   */
+  Sampling.intervalsFromModels = function(arbor, positions, domainDetails,
+      intervalLength, preferSmallerError) {
+    // Get domain arbor, which is then split into slabs, which are then
+    // further split into intervals of respective length.
+    var domainArbor = CATMAID.Sampling.domainArborFromModel(arbor, domainDetails);
+
+    preferSmallerError = preferSmallerError === undefined ? true : !!preferSmallerError;
+
+    // Create Intervals from partitions
+    var intervals = [];
+    var partitions = domainArbor.partitionSorted();
+    for (var i=0; i<partitions.length; ++i) {
+      var partition = partitions[i];
+      // Walk partition toward leaves
+      var dist = 0, lastDist;
+      var intervalStartIdx = partition.length - 1;
+      var intervalStartPos = positions[partition[intervalStartIdx]];
+      // Traverse partition toward leaves, i.e. from the end of the partition
+      // entries to branch points or root.
+      for (var j=partition.length - 2; j>=0; --j) {
+        lastDist = dist;
+        // Calculate new interval length, we can
+        var lastPos = positions[partition[j+1]];
+        var pos = positions[partition[j]];
+        dist += lastPos.distanceTo(pos);
+        //  If sum is greater than interval length, create new interval. If
+        //  <preferSmalError>, the end/start node is either the current one
+        //  or the last one, whichever is closer to the ideal length.
+        //  Otherwise this node is used.
+        if (dist > intervalLength) {
+          var steps = intervalStartIdx - j;
+          // Optionally, make the interval smaller if this means being
+          // closer to the ideal interval length. This can only be done if
+          // the current interval has at least a length of 2.
+          if (preferSmallerError && (intervalLength - lastDist) < dist && steps > 1 && j !== 0) {
+            intervals.push([partition[intervalStartIdx], partition[j+1]]);
+            intervalStartIdx = j + 1;
+          } else {
+            intervals.push([partition[intervalStartIdx], partition[j]]);
+            intervalStartIdx = j;
+          }
+          dist = 0;
+        }
+      }
+    }
+
+    return intervals;
+  };
+
+  /**
    * Get an edge mapping for all edges in the passed in arbor that are part of
    * one of the domains that are part of the passed in sampler.
    */
@@ -64,6 +120,76 @@
       if (domainArbor.root) {
         o[domainArbor.root] = null;
       }
+      return o;
+    }, edges);
+
+    return edges;
+  };
+
+  /**
+   * Get an edge mapping for all edges in the passed in arbor that are part of a
+   * one of the intervals of the domains of the passed in sampler. Note that
+   * the set of interval edges can be smaller than the domain set one.
+   */
+  Sampling.intervalEdges = function(arbor, positions, sampler, preferSmallerError, target) {
+    edges = target || {};
+
+    // Build intervals for each domain, based on the interval length defined in
+    // the sampler.
+    var edges = sampler.domains.reduce(function(o, d) {
+      // Get domain arbor, which is then split into slabs, which are then
+      // further split into intervals of respective length.
+      var domainArbor = CATMAID.Sampling.domainArborFromModel(arbor, d);
+
+      preferSmallerError = preferSmallerError === undefined ? true : !!preferSmallerError;
+
+      var intervalLength = sampler.intervalLength;
+
+      // Create Intervals from partitions
+      var intervals = [];
+      var partitions = domainArbor.partitionSorted();
+      for (var i=0; i<partitions.length; ++i) {
+        var partition = partitions[i];
+        var currentInterval = {};
+        // Walk partition toward leaves
+        var dist, lastDist;
+        var intervalStartIdx = partition.length - 1;
+        var intervalStartPos = positions[partition[intervalStartIdx]];
+        // Traverse partition toward leaves, i.e. from the end of the partition
+        // entries to branch points or root.
+        for (var j=partition.length - 2; j>=0; --j) {
+          lastDist = dist;
+          // Calculate new interval length with new point
+          var lastPos = positions[partition[j+1]];
+          var pos = positions[partition[j]];
+          dist += lastPos.distanceTo(pos);
+
+          //  If the length of the current interval (dist) is greater than
+          //  interval length, create new interval. If <preferSmalError>, the
+          //  end/start node is either the current one or the last one,
+          //  whichever is closer to the ideal length.  Otherwise this node is
+          //  used.
+          if (dist > intervalLength) {
+            var steps = intervalStartIdx - j;
+            // Optionally, make the interval smaller if this means being
+            // closer to the ideal interval length. This can only be done if
+            // the current interval has at least a length of 2.
+            if (preferSmallerError && (intervalLength - lastDist) < dist && steps > 1 && j !== 0) {
+              intervals.push([partition[intervalStartIdx], partition[j-1]]);
+              intervalStartIdx = j + 1;
+            } else {
+              o[partition[j]] = partition[j+1];
+              intervals.push([partition[intervalStartIdx], partition[j]]);
+              intervalStartIdx = j;
+            }
+            dist = 0;
+          } else {
+            // Add current node and its parent to target mapping
+            o[partition[j]] = partition[j+1];
+          }
+        }
+      }
+
       return o;
     }, edges);
 
