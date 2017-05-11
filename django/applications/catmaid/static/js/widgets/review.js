@@ -37,6 +37,12 @@
     // Review updates are made persistent, by default
     self.persistReview = true;
 
+    // A set of filter rules to apply to the handled skeletons
+    this.filterRules = [];
+    // Filter rules can optionally be disabled
+    this.applyFilterRules = true;
+    // A set of nodes allowed by node filters
+    this.allowedNodes = new Set();
 
     this.init = function() {
       this.projectId = project.id;
@@ -1081,6 +1087,20 @@
             onclick: function() {
               self.reviewUpstream = this.checked;
             }
+          }, {
+            type: 'checkbox',
+            label: 'Apply node filters',
+            value: this.applyFilterRules,
+            onclick: function() {
+              self.applyFilterRules = this.checked;
+              if (self.filterRules.length > 0) {
+                if (this.checked) {
+                  self.updateFilter();
+                } else {
+                  self.update();
+                }
+              }
+            }
           }
         ]);
         tabs['Node review'].dataset.mode = 'node-review';
@@ -1251,6 +1271,10 @@
       },
       init: function() {
         this.init();
+      },
+      filter: {
+        rules: this.filterRules,
+        update: this.updateFilter.bind(this)
       }
     };
   };
@@ -1268,6 +1292,37 @@
       this.nodeReviewContainer.style.display = 'none';
       this.analyticsContainer.style.display = 'block';
     }
+  };
+
+  /**
+   * Reevaluate the current set of node filter rules to update the set of
+   * excluded nodes.
+   */
+  CATMAID.ReviewSystem.prototype.updateFilter = function(options) {
+    if (!this.currentSkeletonId || this.filterRules.length === 0) {
+      return Promise.resolve();
+    }
+
+    var self = this;
+    var skeletonsIds = [this.currentSkeletonI];
+
+    return CATMAID.SkeletonFilter.fetchArbors(skeletonIds)
+      .then(function(arbors) {
+        var filter = new CATMAID.SkeletonFilter(self.filterRules, skeletons);
+
+        if (!arbors) {
+          throw new CATMAID.ValueError("Couldn't fetch skeleton arbor");
+        }
+        var filteredNodes = filter.execute(arbors, self.filterRules);
+        self.allowedNodes = new Set(Object.keys(filteredNodes.nodes).map(function(n) {
+          return parseInt(n, 10);
+        }));
+        if (0 === self.allowedNodes.length) {
+          CATMAID.warn("No points left after filter application");
+        }
+        self.update();
+      })
+      .catch(CATMAID.handleError);
   };
 
   // Available stack orientations
