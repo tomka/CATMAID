@@ -378,7 +378,6 @@
           if (this.filter_nodeids.size > 0) {
             let idRegEx = '^(' + Array.from(this.filter_nodeids).join('|') + ')$';
             this.oTable.columns(0).search(idRegEx, true, false, true).draw();
-            //this.oTable.columns(0).search('^(8995095|999)', true, false, true).draw();
           } else {
             this.oTable.columns(0).search('').draw();
           }
