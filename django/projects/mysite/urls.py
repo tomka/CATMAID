@@ -20,11 +20,6 @@ schema_view = get_swagger_view(title='CATMAID API')
 admin.site = AdminSitePlus()
 admin.autodiscover()
 
-# Customize admin site titles and header
-admin.site.site_header = "CATMAID administration"
-admin.site.site_title = "CATMAID site admin"
-admin.site.index_title = "CATMAID instance"
-
 # CATMAID
 urlpatterns = [
     url(r'^', include('catmaid.urls')),

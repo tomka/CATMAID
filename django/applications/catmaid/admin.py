@@ -36,6 +36,18 @@ from catmaid.views.userimporter import UserImportWizard
 from catmaid.views.dataexporter import CatmaidDataExportWizard
 from catmaid.views.image_block_source_importer import ImageBlockSourceImportWizard
 
+
+class CATMAIDAdminSite(admin.AdminSite):
+    site_header = 'CATMAID administration'
+    site_title = 'CATMAID site admin'
+    index_title = 'CATMAID instance'
+
+    def register_view(self, path, name=None, urlname=None, visible=True,
+                      view=None):
+        pass
+  
+
+
 def add_related_field_wrapper(form, col_name, rel=None) -> None:
     """Wrap a field on a form so that a little plus sign appears right next to
     it. If clicked a new instance can be added. Expects the form to have the
@@ -516,42 +528,45 @@ def color(self):
 color.allow_tags = True # type: ignore # https://github.com/python/mypy/issues/2087
 User.color = color
 
+# Create a custom admin site
+admin_site = CATMAIDAdminSite(name='admin')
+
 # Add model admin views
-admin.site.register(BrokenSlice, BrokenSliceAdmin)
-admin.site.register(InterpolatableSection, InterpolatableSectionAdmin)
-admin.site.register(Project, ProjectAdmin)
-admin.site.register(DataView, DataViewAdmin)
-admin.site.register(Stack, StackAdmin)
-admin.site.register(StackGroup, StackGroupAdmin)
-admin.site.register(ProjectStack, ProjectStackAdmin)
-admin.site.register(StackMirror, StackMirrorAdmin)
-admin.site.register(PointCloud, PointCloudAdmin)
+admin_site.register(BrokenSlice, BrokenSliceAdmin)
+admin_site.register(InterpolatableSection, InterpolatableSectionAdmin)
+admin_site.register(Project, ProjectAdmin)
+admin_site.register(DataView, DataViewAdmin)
+admin_site.register(Stack, StackAdmin)
+admin_site.register(StackGroup, StackGroupAdmin)
+admin_site.register(ProjectStack, ProjectStackAdmin)
+admin_site.register(StackMirror, StackMirrorAdmin)
+admin_site.register(PointCloud, PointCloudAdmin)
 
 # Replace the user admin view with custom view
-admin.site.register(User, CustomUserAdmin)
-admin.site.register(Group, CustomGroupAdmin)
-admin.site.register(GroupInactivityPeriod, GroupInactivityPeriodAdmin)
+admin_site.register(User, CustomUserAdmin)
+admin_site.register(Group, CustomGroupAdmin)
+admin_site.register(GroupInactivityPeriod, GroupInactivityPeriodAdmin)
 # Register additional views
-admin.site.register_view('annotationimporter', 'Import annotations and tracing data',
+admin_site.register_view('annotationimporter', 'Import annotations and tracing data',
                          view=ImportingWizard.as_view())
-admin.site.register_view('importer', 'Import projects and image stacks',
+admin_site.register_view('importer', 'Import projects and image stacks',
                          view=importer_admin_view)
-admin.site.register_view('useranalytics', 'User Analytics',
+admin_site.register_view('useranalytics', 'User Analytics',
                          view=UseranalyticsView.as_view())
-admin.site.register_view('userproficiency', 'User Proficiency',
+admin_site.register_view('userproficiency', 'User Proficiency',
                          view=UserProficiencyView.as_view())
-admin.site.register_view('classificationadmin',
+admin_site.register_view('classificationadmin',
                          'Tag Based Classification Graph Linker',
                          view=classification_admin_view)
-admin.site.register_view('groupmembershiphelper',
+admin_site.register_view('groupmembershiphelper',
                          'Manage group memberships',
                          urlname='groupmembershiphelper',
                          view=GroupMembershipHelper.as_view())
-admin.site.register_view('dvidimporter', 'Import DVID stacks',
+admin_site.register_view('dvidimporter', 'Import DVID stacks',
                          view=DVIDImportWizard.as_view())
-admin.site.register_view('userimporter', 'Import users',
+admin_site.register_view('userimporter', 'Import users',
                          view=UserImportWizard.as_view())
-admin.site.register_view('catmaiddataexporter', 'CATMAID data export',
+admin_site.register_view('catmaiddataexporter', 'CATMAID data export',
                          view=CatmaidDataExportWizard.as_view())
-admin.site.register_view('imageblocksourceimporter', 'Import N5 source stacks',
+admin_site.register_view('imageblocksourceimporter', 'Import N5 source stacks',
                          view=ImageBlockSourceImportWizard.as_view())

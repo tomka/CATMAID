@@ -9,6 +9,7 @@ from catmaid import history, spatial
 
 from django.apps import AppConfig
 from django.conf import settings
+from django.contrib.admin.apps import AdminConfig
 from django.core.checks import Warning, register
 from django.core.exceptions import ImproperlyConfigured
 from django.db import connection
@@ -220,6 +221,11 @@ def check_media_path(app_configs, **kwargs) -> List[str]:
                 messages.append(Warning(f"The output folder {sub_output_dir} is not writable"))
 
     return messages
+
+
+class CATMAIDAdminConfig(AdminConfig):
+    default_site = 'catmaid.admin.CATMAIDAdminSite'
+
 
 class CATMAIDConfig(AppConfig):
     name = 'catmaid'
