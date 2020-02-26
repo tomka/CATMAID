@@ -1553,6 +1553,10 @@
     }
   };
 
+  DOM.appendElements = function(target, elements) {
+    return elements.map(e => DOM.appendElement(target, e));
+  };
+
   /**
    * Construct elements from an array of parameters and append them to a tab
    * element.

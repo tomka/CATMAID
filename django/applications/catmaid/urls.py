@@ -17,7 +17,8 @@ from catmaid.control import (authentication, user, group, log, message, client,
         classification, notifications, roi, clustering, volume, noop,
         useranalytics, user_evaluation, search, graphexport, transaction,
         graph2, circles, analytics, review, wiringdiagram, object, sampler,
-        similarity, nat, origin, point, landmarks, pointcloud, pointset)
+        similarity, nat, origin, point, landmarks, pointcloud, pointset,
+        transform)
 
 from catmaid.history import record_request_action as record_view
 from catmaid.views import CatmaidView
@@ -343,6 +344,8 @@ urlpatterns += [
     url(r'^(?P<project_id>\d+)/skeletons/(?P<skeleton_id>\d+)/neuroglancer$', skeletonexport.neuroglancer_skeleton),
     url(r'^(?P<project_id>\d+)/skeletons/(?P<skeleton_id>\d+)/node-overview$', skeletonexport.treenode_overview),
     url(r'^(?P<project_id>\d+)/skeletons/compact-detail$', skeletonexport.compact_skeleton_detail_many),
+    url(r'^(?P<project_id>\d+)/skeletons/from-remote$', skeletonexport.from_remote),
+
     # Marked as deprecated, but kept for backwards compatibility
     url(r'^(?P<project_id>\d+)/(?P<skeleton_id>\d+)/(?P<with_connectors>\d)/(?P<with_tags>\d)/compact-skeleton$', skeletonexport.compact_skeleton),
 ]
@@ -375,6 +378,11 @@ urlpatterns += [
     url(r'^(?P<project_id>\d+)/similarity/queries/(?P<similarity_id>\d+)/$', similarity.SimilarityDetail.as_view()),
     url(r'^(?P<project_id>\d+)/similarity/queries/(?P<similarity_id>\d+)/recompute$', similarity.recompute_similarity),
     url(r'^(?P<project_id>\d+)/similarity/test-setup$', similarity.test_setup),
+]
+
+# Transformations
+urlpatterns += [
+    url(r'^(?P<project_id>\d+)/transform', transform.transform),
 ]
 
 # Cropping

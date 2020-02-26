@@ -1988,3 +1988,25 @@ def treenode_overview(request:HttpRequest, project_id=None, skeleton_id=None) ->
     tags = tuple(cursor.fetchall())
 
     return HttpResponse(json.dumps([treenodes, reviews, tags], separators=(',', ':')))
+
+
+@api_view(['GET'])
+@requires_user_role(UserRole.Browse)
+def from_remote(request:HttpRequest, project_id=None, skeleton_id=None) -> HttpResponse:
+    """Get a skeleton from a remote service, like other CATMAID instances, R or
+    neuPrint.
+    ---
+    parameters:
+    - name: project_id
+      description: The project to operate in
+      required: true
+      type: integer
+      paramType: path
+    - name: source_name
+      description:
+    """
+    project_id = int(project_id)
+    
+    return HttpResponse('')
+
+
