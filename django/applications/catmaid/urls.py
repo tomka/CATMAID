@@ -344,7 +344,7 @@ urlpatterns += [
     url(r'^(?P<project_id>\d+)/skeletons/(?P<skeleton_id>\d+)/neuroglancer$', skeletonexport.neuroglancer_skeleton),
     url(r'^(?P<project_id>\d+)/skeletons/(?P<skeleton_id>\d+)/node-overview$', skeletonexport.treenode_overview),
     url(r'^(?P<project_id>\d+)/skeletons/compact-detail$', skeletonexport.compact_skeleton_detail_many),
-    url(r'^(?P<project_id>\d+)/skeletons/from-remote$', skeletonexport.from_remote),
+    url(r'^(?P<project_id>\d+)/skeletons/from-remote$', skeletonexport.skeletons_from_remote),
 
     # Marked as deprecated, but kept for backwards compatibility
     url(r'^(?P<project_id>\d+)/(?P<skeleton_id>\d+)/(?P<with_connectors>\d)/(?P<with_tags>\d)/compact-skeleton$', skeletonexport.compact_skeleton),

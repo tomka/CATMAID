@@ -30,6 +30,7 @@ from catmaid.control.common import (get_relation_to_id_map, get_request_bool,
 from catmaid.control.review import get_treenodes_to_reviews, \
         get_treenodes_to_reviews_with_time
 from catmaid.control.tree_util import edge_count_to_root, partition
+from catmaid.control.nat.r import load_skeletons_from_remote
 
 
 try:
@@ -1990,9 +1991,56 @@ def treenode_overview(request:HttpRequest, project_id=None, skeleton_id=None) ->
     return HttpResponse(json.dumps([treenodes, reviews, tags], separators=(',', ':')))
 
 
+class SourceInfo():
+    def __init__(self, source_name, source_url, api_key=None, http_auth_user=None,
+            http_auth_pass=None, source_type=None):
+        self.source_name = source_name
+        self.url = source_url
+        self.api_key = api_key
+        self.http_auth_user = http_auth_user
+        self.http_auth_pass = http_auth_pass
+        self.type = source_type or 'catmaid'
+
+    def __str__(self):
+        return f'Data source: {self.source_name}, Type: {self.type}, URL: {self.url}'
+
+    @classmethod
+    def from_client_remote_id(self, source_name=None, user_id=None):
+        if not source_name:
+            raise ValueError("Need a source name")
+
+        # Get the client settings field for remote servers
+        cursor = connection.cursor()
+        cursor.execute("""
+            SELECT value->'entries'->'remote_servers'->'value'
+            FROM client_data cd
+            JOIN client_datastore cds
+                ON cds.id = cd.datastore_id
+            WHERE key = 'client-settings'
+                AND cds.name = 'settings'
+                AND (user_id IS NULL OR user_id = %(user_id)s)
+            ORDER BY project_id NULLS LAST, user_id NULLS LAST
+            LIMIT 1
+        """, {
+            'user_id': user_id,
+        })
+
+        info = None
+        row = cursor.fetchone() 
+        remote_servers = row[0] if row else []
+        for entry in remote_servers:
+            if entry.get('name') == source_name:
+                info = SourceInfo(entry.get('name'), entry.get('url'),
+                        entry.get('api_key'), entry.get('http_auth_user'),
+                        entry.get('http_auth_pass'), entry.get('type'))
+                break
+
+        return info
+
+
 @api_view(['GET'])
 @requires_user_role(UserRole.Browse)
-def from_remote(request:HttpRequest, project_id=None, skeleton_id=None) -> HttpResponse:
+def skeletons_from_remote(request:HttpRequest, project_id=None, skeleton_id=None) -> HttpResponse:
     """Get a skeleton from a remote service, like other CATMAID instances, R or
     neuPrint.
     ---
@@ -2003,10 +2051,34 @@ def from_remote(request:HttpRequest, project_id=None, skeleton_id=None) -> HttpR
       type: integer
       paramType: path
     - name: source_name
-      description:
+      description: |
+        A reference to the source entry in the client settings of the calling
+        user. If empty the current project is used.
+      type: string
+      required: false
+      paramType: form
+    - name source_space
+      type: string
+      description: A refernce to the default space of the skeleton.
+      paramType: form
+    - name target_space
+      type: string
+      description: A refernce to the target space of the skeleton.
+      paramType: form
     """
     project_id = int(project_id)
-    
-    return HttpResponse('')
+    source_name = request.GET.get('source_name')
+    source_space = request.GET.get('source_space')
+    target_space = request.GET.get('target_space')
+
+    source_info = SourceInfo.from_client_remote_id(source_name, request.user.id)
+    print(source_info)
+    result = load_skeletons_from_remote(skeleton_id, source_info, source_space,
+            target_space)
+
+    return JsonResponse({
+        'id': result[skeleton_id],
+        'nodes': [],
+    })
 
 

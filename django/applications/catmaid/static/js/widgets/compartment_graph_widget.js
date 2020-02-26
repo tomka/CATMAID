@@ -892,6 +892,7 @@
   };
 
   GroupGraph.prototype.init = function() {
+
     var options = {
       ready: function() {},
       style: cytoscape.stylesheet()

@@ -245,7 +245,8 @@ def test_environment() -> JsonResponse:
 
         if(!require("devtools")) install.packages("devtools")
         devtools::install_github(c("jefferis/nat", "jefferislab/nat.nblast",
-                "jefferis/rcatmaid", "jefferis/elmr"))
+                "jefferis/rcatmaid", "jefferis/elmr",
+                "flyconnectome/nat.jrcfibf", "neurprintr"))
 
         This is required to let CATMAID compute NBLAST scores.
         """)
@@ -260,7 +261,8 @@ def setup_environment() -> None:
     robjects.r("""
         if(!require("devtools")) install.packages("devtools")
         devtools::install_github(c("jefferis/nat", "jefferislab/nat.nblast",
-                "jefferis/rcatmaid", "jefferis/elmr"))
+                "jefferis/rcatmaid", "jefferis/elmr",
+                "flyconnectome/nat.jrcfibf", "neuprintr"))
         install.packages("doMC")
         install.packages(c("curl", "httr", "R.utils"))
     """)
@@ -642,7 +644,7 @@ def create_dps_data_cache(project_id, object_type, tangent_neighbors=20,
         # Simplify
         if detail > 0:
             logger.debug('Simplifying skeletons')
-            simplified_objects = robjects.r.nlapply(objects, relmr.simplify_neuron, **{
+            simplified_objects = robjects.r.nlapply(objects, rnat.simplify_neuron, **{
                 'n': detail,
                 'OmitFailures': omit_failures,
                 '.parallel': parallel,
@@ -653,7 +655,6 @@ def create_dps_data_cache(project_id, object_type, tangent_neighbors=20,
             objects = simplified_objects
 
         logger.debug('Computing skeleton stats')
-        print('Computing skeleton stats')
         objects_dps = rnat.dotprops(objects, **{
                     'k': tangent_neighbors,
                     'resample': resample_by * nm_to_um,
@@ -846,7 +847,7 @@ def nblast(project_id, user_id, config_id, query_object_ids, target_object_ids,
                 if simplify:
                     logger.debug(f"Simplifying query neurons, removing parts below branch level {required_branches}")
                     query_objects = robjects.r.nlapply(query_objects,
-                            relmr.simplify_neuron, **{
+                            rnat.simplify_neuron, **{
                                 'n': required_branches,
                                 'OmitFailures': omit_failures,
                                 '.parallel': parallel,
@@ -1011,7 +1012,7 @@ def nblast(project_id, user_id, config_id, query_object_ids, target_object_ids,
                     if simplify:
                         logger.debug(f"Simplifying target neurons, removing parts below branch level {required_branches}")
                         target_objects = robjects.r.nlapply(target_objects,
-                                relmr.simplify_neuron, **{
+                                rnat.simplify_neuron, **{
                                     'n': required_branches,
                                     'OmitFailures': omit_failures,
                                     '.parallel': parallel,
@@ -1625,3 +1626,65 @@ def neuronlist_for_skeletons(project_id, skeleton_ids, omit_failures=False,
     gc.collect()
 
     return objects
+
+
+def load_skeleton_from_neuprint(source_info, skeleton_id):
+    pass
+
+
+def search_skeletons_in_neuprint(search_term, source_info=None):
+    """ sarch_term e.g. ".*mPN1.*"
+    """
+
+    """
+    library(nat.jrcfibf)
+    library(neuprintr)
+    conn = neuprint_login(server= source_info.url, token=source_info.api_token
+    opn.info = neuprint_search(search_term)
+    opn.info[is.na(opn.info$type),"type"] = opn.info[is.na(opn.info$type),"name"]
+    rownames(opn.info) = opn.info$bodyid
+    name.split = strsplit(opn.info$name,split=c("\\(|\\_"))
+    gloms = sapply(name.split, function(x) tryCatch(x[[2]], error = function(e) ""))
+    names(gloms) = opn.info$bodyid
+    opn.info$glomerulus = gloms
+    opn.info = subset(opn.info, glomerulus!="")
+    opn = neuprint_read_neurons(opn.info$bodyid[1])
+    """
+
+
+def load_skeletons_from_catmaid(skeleton_id, source_info=None):
+    return None
+
+
+def load_skeletons_from_neuprint(skeleton_id, source_info=None):
+    rnat = importr('nat')
+    rneuprintr = importr('neuprintr')
+    print(source_info.api_key)
+    conn = rneuprintr.neuprint_login(server=source_info.url, token=source_info.api_key)
+    if not conn:
+        raise ValueError(f'Could not establish a connection to {source_info.url}')
+
+    opn.info = rneuprintr.neuprint_search(".*mPN1.*")
+
+
+def load_skeletons_from_remote(skeleton_id, source_info=None, source_ref=None,
+        target_ref=None):
+    """Load skeleton data, optionally from a remote server and a space
+    transformation.
+    """
+    print(source_info.type)
+    if source_info.type == 'catmaid':
+        objects = None #TODO
+    elif source_info.type == 'neuprint':
+        objects = load_skeletons_from_neuprint(skeleton_id, source_info)
+    else:
+        raise ValueError(f'Unknown source type {source_info.type}')
+
+    """
+    xt = xform_brain(opn, sample=JRCFIB2018Fraw, reference=FAFB14)
+    """
+
+    rnattemplatebrains = importr('nat.templatebrains')
+    xt = rnattemplatebrains.xform_brain(objects, sample=source_ref, reference=target_ref)
+
+    return xt
